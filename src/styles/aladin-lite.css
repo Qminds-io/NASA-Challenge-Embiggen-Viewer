@@ -1,0 +1,43 @@
+/* CSS mínimo para que Aladin Lite sea usable sin CDN oficial */
+.aladin-container, .aladin-box, .aladin-zoomGrp, .aladin-location, .aladin-status-bar,
+.aladin-fullScreen-control, .aladin-settings-control, .aladin-projection-control,
+.aladin-stack-control, .aladin-grid-control, .aladin-share-control {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: #e5e7eb;
+}
+
+.aladin-box {
+  background: rgba(17,24,39,.6);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.aladin-location, .aladin-status-bar {
+  background: rgba(17,24,39,.55);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.aladin-zoomGrp button,
+.aladin-settings-control, .aladin-projection-control, .aladin-fullScreen-control,
+.aladin-grid-control, .aladin-share-control, .aladin-stack-control {
+  background: rgba(17,24,39,.6);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.aladin-zoomGrp button:hover,
+.aladin-settings-control:hover, .aladin-projection-control:hover,
+.aladin-fullScreen-control:hover, .aladin-grid-control:hover,
+.aladin-share-control:hover, .aladin-stack-control:hover {
+  background: rgba(31,41,55,.6);
+}
+
+/* Asegurar que el canvas ocupe todo el contenedor negro que le dimos */
+#aladin-lite-div, .aladin-container, canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
