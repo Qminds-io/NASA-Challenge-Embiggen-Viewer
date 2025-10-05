@@ -1,4 +1,6 @@
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchLayersCatalog, type LayersCatalog } from "../services/api";
 
 /* ========= config logo ========= */
 const LOGO_SRC = "/Logo.png"; // ruta del logo (SVG/PNG)
@@ -18,7 +20,7 @@ function realTimeDelaySeconds(durationSec: number): string {
   return `-${progress}s`;
 }
 
-/** Config genérica de cuerpos */
+/** Config genÃ©rica de cuerpos */
 type Proj = "EPSG:3857" | "EPSG:4326";
 type BodyId =
   | "Sun"
@@ -212,6 +214,49 @@ const BODIES: BodyConfig[] = [
 /* ========= Vista principal ========= */
 export default function SolarSystem() {
   const navigate = useNavigate();
+  const [catalog, setCatalog] = useState<LayersCatalog>([]);
+  const [catalogStatus, setCatalogStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogStatus("loading");
+    fetchLayersCatalog()
+      .then((data) => {
+        if (cancelled) return;
+        setCatalog(data);
+        setCatalogStatus("ready");
+        setCatalogError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to load layer catalog", error);
+        setCatalogStatus("error");
+        setCatalogError(error instanceof Error ? error.message : "No se pudo cargar el catalogo");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+
+  const catalogBodies = useMemo(() => {
+    const map = new Map(catalog.map((entry) => [entry.bodyId, entry]));
+    return BODIES.map((body) => {
+      const entry = map.get(body.id);
+      if (!entry || entry.layers.length === 0) {
+        return { ...body, enabled: false, key: undefined, proj: undefined, label: body.label };
+      }
+      const defaultLayer = entry.layers[0];
+      return {
+        ...body,
+        enabled: true,
+        key: defaultLayer.layerKey,
+        proj: defaultLayer.projection as Proj,
+        label: defaultLayer.title,
+      };
+    });
+  }, [catalog]);
 
   const openBody = (b: BodyConfig) => {
     if (!b.enabled || !b.key || !b.proj) return;
@@ -219,8 +264,9 @@ export default function SolarSystem() {
     navigate({ pathname: "/map", hash });
   };
 
-  const enabledBodies = BODIES.filter((b) => b.enabled && !b.isMoonOf);
-  const enabledMoons = BODIES.filter((b) => b.enabled && b.isMoonOf);
+  const bodiesList = catalogStatus === "ready" ? catalogBodies : BODIES;
+  const enabledBodies = bodiesList.filter((b) => b.enabled && !b.isMoonOf);
+  const enabledMoons = bodiesList.filter((b) => b.enabled && b.isMoonOf);
 
   return (
     <div className="min-h-screen relative bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100 overflow-hidden">
@@ -235,20 +281,27 @@ export default function SolarSystem() {
             decoding="async"
           />
           <h1 className="text-xl font-extrabold tracking-tight">
-            Quantic View — Solar System
+            Quantic View â€” Solar System
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-300">
           Tap a body to open the viewer with its default layer. In the viewer, you can change layers for the same body.
         </p>
+        {catalogStatus === "error" && catalogError && (
+          <div className="mt-3 text-xs text-rose-400">{catalogError}</div>
+        )}
+        {catalogStatus === "loading" && (
+          <div className="mt-3 text-xs text-slate-300">Cargando catalogo...</div>
+        )}
+
       </div>
 
       {/* Diagrama orbital (md+) */}
       <div className="hidden md:block">
-        <SolarDiagram bodies={BODIES} onOpen={openBody} />
+        <SolarDiagram bodies={bodiesList} onOpen={openBody} />
       </div>
 
-      {/* Fallback móvil: tarjetas solo de habilitados */}
+      {/* Fallback mÃ³vil: tarjetas solo de habilitados */}
       <div className="block md:hidden max-w-6xl mx-auto px-4 pb-14">
         <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 mt-6">
           {enabledBodies.map((b) => (
@@ -282,7 +335,7 @@ export default function SolarSystem() {
         </div>
 
         <div className="mt-10 text-xs text-slate-400">
-          Fuentes: NASA EOSDIS GIBS · NASA Solar System Treks.
+          Fuentes: NASA EOSDIS GIBS Â· NASA Solar System Treks.
         </div>
       </div>
 
@@ -333,7 +386,7 @@ export default function SolarSystem() {
   );
 }
 
-/* =============== Diagrama con órbitas animadas y dinámicas =============== */
+/* =============== Diagrama con Ã³rbitas animadas y dinÃ¡micas =============== */
 
 function SolarDiagram({
   bodies,
@@ -359,7 +412,7 @@ function SolarDiagram({
         <div className="sun-core" />
       </div>
 
-      {/* Órbitas */}
+      {/* Ã“rbitas */}
       {rings.map((ring) => {
         const radius = ringRadius(ring);
         const durSec = durationSeconds(ring);
@@ -432,7 +485,7 @@ function SolarDiagram({
 
       {/* Leyenda */}
       <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-xs text-slate-400">
-        Fuentes: NASA EOSDIS GIBS · NASA Solar System Treks
+        Fuentes: NASA EOSDIS GIBS Â· NASA Solar System Treks
       </div>
     </div>
   );
@@ -548,7 +601,7 @@ function PlanetButton({
         tabIndex={-1}
       >
         <div className="font-semibold text-sm">{label}</div>
-        <div className="text-[11px] opacity-80">{caption || "Próximamente"}</div>
+        <div className="text-[11px] opacity-80">{caption || "PrÃ³ximamente"}</div>
       </button>
     </div>
   );
@@ -588,13 +641,13 @@ function MiniMoonButton({
         tabIndex={-1}
       >
         <div className="text-[13px] font-semibold text-slate-100">{title}</div>
-        <div className="text-[11px] opacity-80">{caption || "Próximamente"}</div>
+        <div className="text-[11px] opacity-80">{caption || "PrÃ³ximamente"}</div>
       </button>
     </div>
   );
 }
 
-/* =============== Fallback cards (móvil) =============== */
+/* =============== Fallback cards (mÃ³vil) =============== */
 
 function PlanetCard({
   name,
@@ -653,7 +706,7 @@ function durationSeconds(ring: number | undefined): number {
   return base + step * (Number(ring ?? 1) - 1);
 }
 
-/* =============== CSS específico del diagrama =============== */
+/* =============== CSS especÃ­fico del diagrama =============== */
 
 const css = `
 :root{
@@ -689,7 +742,7 @@ const css = `
 /* No capturar eventos del sol */
 .solar-center, .sun-core, .sun-glow { pointer-events: none; }
 
-/* Órbitas (anillos) */
+/* Ã“rbitas (anillos) */
 .orbit {
   position: absolute;
   top: 50%;
