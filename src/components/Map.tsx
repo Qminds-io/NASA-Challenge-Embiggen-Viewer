@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import "ol/ol.css";
 
@@ -8,11 +8,10 @@ import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
 
 import XYZ from "ol/source/XYZ";
-import WMTS from "ol/source/WMTS";
 import OSM from "ol/source/OSM";
 import VectorSource from "ol/source/Vector";
 
-import { get as getProj, transform } from "ol/proj";
+import { transform, transformExtent } from "ol/proj";
 import { getWidth as extentWidth } from "ol/extent";
 import { defaults as defaultControls, ScaleLine } from "ol/control";
 
@@ -25,6 +24,8 @@ import GeoJSON from "ol/format/GeoJSON";
 import type Feature from "ol/Feature";
 import type { FeatureLike } from "ol/Feature";
 import { Point, Polygon } from "ol/geom";
+import type Geometry from "ol/geom/Geometry";
+
 
 import Style from "ol/style/Style";
 import Stroke from "ol/style/Stroke";
@@ -32,126 +33,52 @@ import Fill from "ol/style/Fill";
 import CircleStyle from "ol/style/Circle";
 import Text from "ol/style/Text";
 
-import WMTSTileGrid from "ol/tilegrid/WMTS";
+import TileGrid from "ol/tilegrid/TileGrid";
 import Navbar from "./Navbar";
+import { apiUrl } from "../services/api";
+import { findLayer, flattenCatalog, getLayerCatalog, layerDefaultDate, layerNeedsDate } from "../services/layers";
+import type { ApiLayer, LayerCatalog } from "../services/layers";
+import { fetchAnnotations, saveAnnotations } from "../services/annotations";
 
-/* =======================================================
-   Tipos / Config
-======================================================= */
+import type { FrameDescriptor } from "../services/annotations";
+
+
 type DrawMode = "None" | "Point" | "Polygon";
 
-type GibsLayer = {
-  kind: "gibs";
-  id: string; // id GIBS
-  title: string;
-  matrixSet: "GoogleMapsCompatible_Level8" | "GoogleMapsCompatible_Level9";
-  ext: "jpg" | "png";
-};
+type PermalinkState = { lon?: number; lat?: number; z?: number; d?: string; k?: string; p?: string };
 
-type TrekBody = "Moon" | "Mars" | "Ceres";
+type LayerOption = { id: string; title: string };
 
-type TrekLayer = {
-  kind: "trek";
-  body: TrekBody;
-  title: string;
-  /** Endpoint REST hasta el nombre de la capa (sin /1.0.0/...). */
-  endpoint: string;
-  format: "jpg" | "png";
-  maxLevel?: number;
-};
+const SUPPORTED_PROJECTIONS = new Set(["EPSG:3857", "EPSG:4326"]);
 
-type AnyLayer = GibsLayer | TrekLayer;
-
-/* ====== GIBS seguras (Earth) ====== */
-const GIBS_LAYERS: GibsLayer[] = [
-  // True Color (diurnas)
-  { kind: "gibs", id: "MODIS_Terra_CorrectedReflectance_TrueColor", title: "🌍 MODIS Terra — True Color",  ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "MODIS_Aqua_CorrectedReflectance_TrueColor",  title: "🌍 MODIS Aqua — True Color",   ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "VIIRS_SNPP_CorrectedReflectance_TrueColor",  title: "🌍 VIIRS SNPP — True Color",   ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-
-  // Composiciones útiles
-  { kind: "gibs", id: "MODIS_Terra_CorrectedReflectance_Bands721",  title: "🌍 MODIS Terra — 7-2-1 (polvo/humo)", ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "MODIS_Terra_CorrectedReflectance_Bands367",  title: "🌍 MODIS Terra — 3-6-7 (vegetación)",   ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-
-  // Estáticos / nocturnos (⚠ Blue Marble en Level8)
-  { kind: "gibs", id: "BlueMarble_ShadedRelief",                    title: "🌍 Blue Marble — Shaded Relief (estático)",  ext: "jpg", matrixSet: "GoogleMapsCompatible_Level8" },
-  { kind: "gibs", id: "BlueMarble_ShadedRelief_Bathymetry",         title: "🌍 Blue Marble — Relieve + Batimetría",       ext: "jpg", matrixSet: "GoogleMapsCompatible_Level8" },
-  { kind: "gibs", id: "VIIRS_CityLights_2012",                      title: "🌍 City Lights 2012 (nocturno estático)",     ext: "jpg", matrixSet: "GoogleMapsCompatible_Level8" },
-];
-
-/* ====== TREKS (REST, EPSG:4326) ====== */
-const TREK_LAYERS: TrekLayer[] = [
-  /* ——— Mars ——— */
-  {
-    kind: "trek",
-    body: "Mars",
-    title: "🪐 Mars — MOLA Color Shaded Relief (463m)",
-    endpoint: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m",
-    format: "jpg",
-    maxLevel: 10,
-  },
-  {
-    kind: "trek",
-    body: "Mars",
-    title: "🪐 Mars — Viking MDIM21 Color Mosaic (232m)",
-    endpoint: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m",
-    format: "jpg",
-    maxLevel: 10,
-  },
-
-  /* ——— Moon ——— */
-  {
-    kind: "trek",
-    body: "Moon",
-    title: "🌙 Moon — LRO LOLA Color Shaded (128ppd)",
-    endpoint: "https://trek.nasa.gov/tiles/Moon/EQ/LRO_LOLA_ClrShade_Global_128ppd_v04",
-    format: "png",
-    maxLevel: 8,
-  },
-  {
-    kind: "trek",
-    body: "Moon",
-    title: "🌙 Moon — WAC Global Mosaic (100m, 2013)",
-    endpoint: "https://trek.nasa.gov/tiles/Moon/EQ/LROC_WAC_Mosaic_Global_100m_June2013",
-    format: "jpg",
-    maxLevel: 10,
-  },
-
-  /* ——— Ceres ——— */
-  {
-    kind: "trek",
-    body: "Ceres",
-    title: "🪐 Ceres — Dawn FC HAMO Color Shaded (60ppd, 2016)",
-    endpoint: "https://trek.nasa.gov/tiles/Ceres/EQ/Ceres_Dawn_FC_HAMO_ClrShade_DLR_Global_60ppd_Oct2016",
-    format: "jpg",
-    maxLevel: 10,
-  },
-  {
-    kind: "trek",
-    body: "Ceres",
-    title: "🪐 Ceres — Dawn FC Global Color Mosaic (Oct 2016)",
-    endpoint: "https://trek.nasa.gov/tiles/Ceres/EQ/Ceres_Dawn_FC_Mosaic_Global_60ppd_Oct2016",
-    format: "jpg",
-    maxLevel: 10,
-  },
-];
-
-// Lista plana para búsquedas internas
-const LAYERS: AnyLayer[] = [...GIBS_LAYERS, ...TREK_LAYERS];
-
-/* ===== util fecha ===== */
 function todayISO() {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-/* ===== util GIBS URL ===== */
-function buildGibsUrl(dateISO: string, layer: GibsLayer) {
-  // WMTS estilo REST (GIBS permite usarlo como XYZ)
-  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer.id}/default/${dateISO}/${layer.matrixSet}/{z}/{y}/{x}.${layer.ext}`;
+function readHash(): PermalinkState {
+  const h = window.location.hash.replace("#", "");
+  if (!h) return {};
+  const parts = h.split(",");
+  const [lon, lat, z, d, k, p] = [parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]];
+  return {
+    lon: lon ? Number(lon) : undefined,
+    lat: lat ? Number(lat) : undefined,
+    z: z ? Number(z) : undefined,
+    d: d || undefined,
+    k: k || undefined,
+    p: p || undefined,
+  };
 }
 
-/* ===== Estilo de anotaciones ===== */
+function writeHash(view: View, dateISO: string, layerKey: string) {
+  const proj = view.getProjection().getCode();
+  const center = view.getCenter() || [0, 0];
+  const [lon, lat] = transform(center, proj, "EPSG:4326");
+  const zoom = view.getZoom() ?? 2;
+  window.history.replaceState(null, "", `#${lon.toFixed(5)},${lat.toFixed(5)},${zoom.toFixed(2)},${dateISO},${layerKey},${proj}`);
+}
+
 const annotationStyle = (feature: FeatureLike) => {
   const name = feature.get("name") ?? "";
   const isPoint = feature.getGeometry()?.getType() === "Point";
@@ -172,75 +99,23 @@ const annotationStyle = (feature: FeatureLike) => {
   });
 };
 
-/* ===== Permalink (#lon,lat,zoom,fecha,layerKey,proj) ===== */
-type PermalinkState = { lon?: number; lat?: number; z?: number; d?: string; k?: string; p?: string };
-function readHash(): PermalinkState {
-  const h = window.location.hash.replace("#", "");
-  if (!h) return {};
-  const parts = h.split(",");
-  const [lon, lat, z, d, k, p] = [parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]];
-  return {
-    lon: lon ? Number(lon) : undefined,
-    lat: lat ? Number(lat) : undefined,
-    z: z ? Number(z) : undefined,
-    d: d || undefined,
-    k: k || undefined,
-    p: p || undefined,
-  };
-}
-function writeHash(view: View, dateISO: string, layerKey: string) {
-  const proj = view.getProjection().getCode();
-  const center = view.getCenter() || [0, 0];
-  const [lon, lat] = transform(center, proj, "EPSG:4326");
-  const zoom = view.getZoom() ?? 2;
-  window.history.replaceState(null, "", `#${lon.toFixed(5)},${lat.toFixed(5)},${zoom.toFixed(2)},${dateISO},${layerKey},${proj}`);
-}
+const resolveTileTemplate = (template: string, dateISO: string) =>
+  template.includes("{date}") ? template.replace(/\{date\}/g, encodeURIComponent(dateISO)) : template;
+export default function MapView() {
+  const hash = useMemo(() => readHash(), []);
 
-/* ===== helpers de clave de capa ===== */
-const layerKey = (l: AnyLayer) =>
-  l.kind === "gibs" ? `gibs:${l.id}` : `trek:${l.body}:${l.endpoint}`;
-
-function parseLayerKey(k?: string) {
-  if (!k) return null;
-  if (k.startsWith("gibs:")) {
-    return { kind: "gibs" as const, id: k.slice(5) };
-  }
-  if (k.startsWith("trek:")) {
-    // trek:<Body>:<endpoint>
-    const rest = k.slice(5);
-    const firstColon = rest.indexOf(":");
-    if (firstColon === -1) return null;
-    const body = rest.slice(0, firstColon) as TrekBody;
-    const endpoint = rest.slice(firstColon + 1);
-    return { kind: "trek" as const, body, endpoint };
-  }
-  return null;
-}
-
-/* =======================================================
-   Map (principal)
-======================================================= */
-export default function App() {
   const mapDivRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
-  const hash = readHash();
 
-  // Estado UI
-  const [date, setDate] = useState<string>(hash.d ?? todayISO());
+  const [catalog, setCatalog] = useState<LayerCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+
+  const [active, setActive] = useState<ApiLayer | null>(null);
+  const activeRef = useRef<ApiLayer | null>(null);
+
+  const [date, setDate] = useState<string>(hash.d ?? "");
   const dateRef = useRef(date);
-  useEffect(() => { dateRef.current = date; }, [date]);
-
-  // Capa activa (respetar hash; si no coincide, fallback silencioso al mismo “dominio”)
-  const hashParsed = parseLayerKey(hash.k);
-  let defaultLayer: AnyLayer | undefined = LAYERS.find((l) => layerKey(l) === (hash.k ?? ""));
-  if (!defaultLayer && hashParsed?.kind === "gibs") {
-    defaultLayer = GIBS_LAYERS[0];
-  } else if (!defaultLayer && hashParsed?.kind === "trek") {
-    defaultLayer = TREK_LAYERS.find((t) => t.body === hashParsed!.body) ?? TREK_LAYERS[0];
-  }
-  if (!defaultLayer) defaultLayer = LAYERS[0];
-
-  const [active, setActive] = useState<AnyLayer>(defaultLayer);
 
   const [opacity, setOpacity] = useState<number>(1);
   const [drawMode, setDrawMode] = useState<DrawMode>("None");
@@ -250,7 +125,10 @@ export default function App() {
   const [cursorCoord, setCursorCoord] = useState<{ lon: number; lat: number } | null>(null);
   const [filter, setFilter] = useState("");
 
-  // Refs OL
+  const [annotationsLoading, setAnnotationsLoading] = useState(false);
+  const [annotationsSaving, setAnnotationsSaving] = useState(false);
+  const [annotationsError, setAnnotationsError] = useState<string | null>(null);
+
   const mapRef = useRef<Map | null>(null);
   const imageryLayerRef = useRef<TileLayer<any> | null>(null);
   const baseLayerRef = useRef<TileLayer<OSM> | null>(null);
@@ -260,8 +138,61 @@ export default function App() {
   const selectRef = useRef<Select | null>(null);
 
   const annotationsStyle = useMemo(() => annotationStyle, []);
+  const geoJsonFormat = useMemo(() => new GeoJSON(), []);
+  const skipPersistRef = useRef(false);
+  const saveTimeoutRef = useRef<number | null>(null);
+  const fetchTimeoutRef = useRef<number | null>(null);
 
-  /* ===== Navbar height + map.updateSize ===== */
+  useEffect(() => { dateRef.current = date; }, [date]);
+  useEffect(() => { activeRef.current = active; }, [active]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogLoading(true);
+    getLayerCatalog()
+      .then((data) => {
+        if (cancelled) return;
+        setCatalog(data);
+        setCatalogError(null);
+        setCatalogLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCatalogError(err instanceof Error ? err.message : "No se pudo cargar el catalogo");
+        setCatalogLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const allLayers = useMemo(() => (catalog ? flattenCatalog(catalog) : []), [catalog]);
+
+  useEffect(() => {
+    if (!catalog || active) return;
+    let next: ApiLayer | undefined;
+    if (hash.k) {
+      next = findLayer(catalog, hash.k);
+      if (!next && hash.k.startsWith("trek:")) {
+        const parts = hash.k.split(":");
+        if (parts.length >= 2) {
+          const bodyFromKey = parts[1].toLowerCase();
+          next = allLayers.find((layer) => layer.body.toLowerCase() === bodyFromKey);
+        }
+      }
+      if (!next && hash.k.startsWith("gibs:")) {
+        next = allLayers.find((layer) => layer.kind === "gibs");
+      }
+    }
+    if (!next) {
+      next = allLayers.find((layer) => layer.kind === "gibs") ?? allLayers[0];
+    }
+    if (next) setActive(next);
+  }, [catalog, active, allLayers, hash.k]);
+
+  useEffect(() => {
+    if (!active) return;
+    setDate((prev) => (prev && prev.length > 0 ? prev : layerDefaultDate(active, todayISO())));
+  }, [active]);
+
   useEffect(() => {
     const applyNavbarHeight = () => {
       const h = headerRef.current?.offsetHeight ?? 64;
@@ -277,12 +208,13 @@ export default function App() {
       window.removeEventListener("resize", applyNavbarHeight);
     };
   }, []);
-
-  // Helpers de carga para cualquier source de teselas
   const attachTileLoadEvents = (src: any) => {
     const onStart = () => setTilePending((p) => p + 1);
-    const onEnd   = () => setTilePending((p) => Math.max(0, p - 1));
-    const onError = () => { setTilePending((p) => Math.max(0, p - 1)); setTileErrors((e) => e + 1); };
+    const onEnd = () => setTilePending((p) => Math.max(0, p - 1));
+    const onError = () => {
+      setTilePending((p) => Math.max(0, p - 1));
+      setTileErrors((e) => e + 1);
+    };
     src.on("tileloadstart", onStart);
     src.on("tileloadend", onEnd);
     src.on("tileloaderror", onError);
@@ -293,102 +225,222 @@ export default function App() {
     };
   };
 
-  // Crear capa de imagen (GIBS o TREK) REST manual
-  const makeImageryLayerREST = (sel: TrekLayer | GibsLayer) => {
-    if ((sel as GibsLayer).kind === "gibs") {
-      const gsel = sel as GibsLayer;
-      const src = new XYZ({
-        url: buildGibsUrl(dateRef.current, gsel),
-        crossOrigin: "anonymous",
-        tilePixelRatio: 1,
-      });
-      const cleanup = attachTileLoadEvents(src);
-      const lyr = new TileLayer({ source: src, opacity, zIndex: 1 });
-      (lyr as any).__cleanup = cleanup;
-      return lyr;
-    } else {
-      const tsel = sel as TrekLayer;
-      // TREK WMTS en EPSG:4326 (WGS84Quad) con Grid manual (REST)
-      const projection = getProj("EPSG:4326")!;
-      const extent = [-180, -90, 180, 90];
-      const size = extentWidth(extent) / 256; // 360/256
-      const max = tsel.maxLevel ?? 10;
-      const resolutions = new Array(max + 1).fill(0).map((_, z) => (size / 2) / Math.pow(2, z));
-      const matrixIds = new Array(max + 1).fill(0).map((_, z) => String(z));
+  const computeFrame = (): FrameDescriptor | null => {
+    const map = mapRef.current;
+    const layer = activeRef.current;
+    if (!map || !layer) return null;
+    const view = map.getView();
+    const projectionCode = view.getProjection().getCode();
+    const size = map.getSize();
+    if (!size) return null;
+    const extent = view.calculateExtent(size);
+    const extent4326 = transformExtent(extent, projectionCode, "EPSG:4326");
+    const center = transform(view.getCenter() || [0, 0], projectionCode, "EPSG:4326");
+    return {
+      layerKey: layer.layerKey,
+      projection: projectionCode,
+      date: layerNeedsDate(layer) ? (dateRef.current || undefined) : undefined,
+      zoom: view.getZoom() ?? undefined,
+      opacity,
+      center: { lon: center[0], lat: center[1] },
+      extent: {
+        minLon: extent4326[0],
+        minLat: extent4326[1],
+        maxLon: extent4326[2],
+        maxLat: extent4326[3],
+      },
+    };
+  };
 
-      const grid = new WMTSTileGrid({
-        origin: [-180, 90],
-        resolutions,
-        matrixIds,
-        tileSize: [256, 256],
-        extent,
-      });
+  const scheduleFetchAnnotations = () => {
+    if (fetchTimeoutRef.current) window.clearTimeout(fetchTimeoutRef.current);
+    fetchTimeoutRef.current = window.setTimeout(() => {
+      fetchTimeoutRef.current = null;
+      void loadAnnotations();
+    }, 250);
+  };
 
-      const src = new WMTS({
-        requestEncoding: "REST",
-        url: `${tsel.endpoint}/1.0.0/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.${tsel.format}`,
-        layer: "default",
-        matrixSet: "default028mm",
-        format: tsel.format === "jpg" ? "image/jpeg" : "image/png",
-        style: "default",
-        projection,
-        tileGrid: grid,
-        wrapX: true,
-        crossOrigin: "anonymous",
+  const loadAnnotations = async () => {
+    const source = annotationsSourceRef.current;
+    const map = mapRef.current;
+    if (!source || !map || !activeRef.current) return;
+    const frame = computeFrame();
+    if (!frame) return;
+    setAnnotationsLoading(true);
+    try {
+      const remote = await fetchAnnotations(frame);
+      const viewProj = map.getView().getProjection().getCode();
+      skipPersistRef.current = true;
+      source.clear();
+      remote.forEach((item) => {
+        const feature = geoJsonFormat.readFeature(item.feature as Record<string, unknown>, { dataProjection: "EPSG:4326", featureProjection: viewProj }) as Feature<Geometry>;
+        if (item.id !== undefined && item.id !== null) feature.setId(item.id);
+        feature.set("order", item.order);
+        if (item.properties) {
+          Object.entries(item.properties).forEach(([key, value]) => {
+            feature.set(key, value);
+          });
+        }
+        source.addFeature(feature);
       });
-      const cleanup = attachTileLoadEvents(src);
-      const lyr = new TileLayer({ source: src, opacity, zIndex: 1 });
-      (lyr as any).__cleanup = cleanup;
-      return lyr;
+      skipPersistRef.current = false;
+      setAnnotationsError(null);
+      setAnnotKey((k) => k + 1);
+    } catch (err) {
+      if (err instanceof Error) setAnnotationsError(err.message);
+      else setAnnotationsError("No se pudieron cargar las anotaciones.");
+    } finally {
+      setAnnotationsLoading(false);
+      skipPersistRef.current = false;
     }
   };
 
-  // Cambiar proyección + reconfigurar capas base/imagery
-  const ensureProjection = (targetProj: "EPSG:3857" | "EPSG:4326", keepCenter = true) => {
+  const schedulePersistAnnotations = () => {
+    if (skipPersistRef.current) return;
+    if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveTimeoutRef.current = null;
+      void persistAnnotations();
+    }, 400);
+  };
+
+  const persistAnnotations = async () => {
+    const source = annotationsSourceRef.current;
+    const map = mapRef.current;
+    if (!source || !map) return;
+    const frame = computeFrame();
+    if (!frame) return;
+    const viewProj = map.getView().getProjection().getCode();
+    const sourceFeatures = source.getFeatures();
+    const payload = sourceFeatures.map((feat, index) => {
+      const featureObject = geoJsonFormat.writeFeatureObject(feat, {
+        featureProjection: viewProj,
+        dataProjection: "EPSG:4326",
+        decimals: 6,
+      });
+      const { geometry, ...props } = feat.getProperties();
+      return {
+        id: (feat.getId() as string | number | null) ?? undefined,
+        order: index,
+        feature: featureObject,
+        properties: props,
+      };
+    });
+    setAnnotationsSaving(true);
+    try {
+      const saved = await saveAnnotations({ frame, features: payload });
+      skipPersistRef.current = true;
+      saved.forEach((item, index) => {
+        const feature = sourceFeatures[index];
+        if (!feature) return;
+        if (item.id !== undefined && item.id !== null) feature.setId(item.id);
+        feature.set("order", item.order);
+        if (item.properties) {
+          Object.entries(item.properties).forEach(([key, value]) => {
+            feature.set(key, value);
+          });
+        }
+      });
+      skipPersistRef.current = false;
+      setAnnotationsError(null);
+      setAnnotKey((k) => k + 1);
+    } catch (err) {
+      skipPersistRef.current = false;
+      setAnnotationsError(err instanceof Error ? err.message : "No se pudieron guardar las anotaciones.");
+    } finally {
+      setAnnotationsSaving(false);
+    }
+  };
+
+  const makeImageryLayer = (layer: ApiLayer) => {
+    const template = resolveTileTemplate(layer.tileTemplate, dateRef.current || layerDefaultDate(layer, todayISO()));
+    const url = apiUrl(template);
+
+    if (layer.projection === "EPSG:4326") {
+      const extent: [number, number, number, number] = [-180, -90, 180, 90];
+      const size = extentWidth(extent) / 256;
+      const max = layer.maxZoom ?? 10;
+      const resolutions = new Array(max + 1).fill(0).map((_, z) => (size / 2) / Math.pow(2, z));
+      const tileGrid = new TileGrid({
+        extent,
+        origin: [-180, 90],
+        tileSize: 256,
+        resolutions,
+      });
+
+      const source = new XYZ({
+        url,
+        projection: "EPSG:4326",
+        tileGrid,
+        wrapX: true,
+        crossOrigin: "anonymous",
+      });
+      const cleanup = attachTileLoadEvents(source);
+      const lyr = new TileLayer({ source, opacity, zIndex: 1 });
+      (lyr as any).__cleanup = cleanup;
+      return lyr;
+    }
+
+    const source = new XYZ({
+      url,
+      projection: "EPSG:3857",
+      wrapX: true,
+      crossOrigin: "anonymous",
+      maxZoom: layer.maxZoom,
+    });
+    const cleanup = attachTileLoadEvents(source);
+    const lyr = new TileLayer({ source, opacity, zIndex: 1 });
+    (lyr as any).__cleanup = cleanup;
+    return lyr;
+  };
+
+  const ensureProjection = (layer: ApiLayer, keepCenter = true) => {
     const map = mapRef.current;
     if (!map) return;
-    const currProj = map.getView().getProjection().getCode();
-    if (currProj === targetProj) return;
+    const targetProj = layer.projection === "EPSG:4326" ? "EPSG:4326" : "EPSG:3857";
+    const view = map.getView();
+    const currentProj = view.getProjection().getCode();
 
-    const centerWgs =
-      keepCenter
-        ? transform(map.getView().getCenter() || [0, 0], currProj, "EPSG:4326")
-        : [0, 0];
+    if (currentProj !== targetProj) {
+      const center4326 = keepCenter ? transform(view.getCenter() || [0, 0], currentProj, "EPSG:4326") : [0, 0];
+      const newView = new View({
+        projection: targetProj,
+        center: transform(center4326, "EPSG:4326", targetProj),
+        zoom: Math.max(2, Math.min(view.getZoom() ?? 2, layer.maxZoom ?? (targetProj === "EPSG:4326" ? 10 : 14))),
+        maxZoom: layer.maxZoom ?? (targetProj === "EPSG:4326" ? 10 : 14),
+      });
+      map.setView(newView);
+    } else {
+      view.setMaxZoom(layer.maxZoom ?? (targetProj === "EPSG:4326" ? 10 : 14));
+    }
 
-    const view = new View({
-      projection: targetProj,
-      center: transform(centerWgs, "EPSG:4326", targetProj),
-      zoom: Math.max(2, Math.min(map.getView().getZoom() ?? 2, 12)),
-    });
-    map.setView(view);
-
-    if (baseLayerRef.current) {
+    if (targetProj === "EPSG:3857") {
+      if (!baseLayerRef.current) {
+        const base = new TileLayer({ source: new OSM(), zIndex: 0 });
+        baseLayerRef.current = base;
+        map.getLayers().insertAt(0, base);
+      }
+    } else if (baseLayerRef.current) {
       map.removeLayer(baseLayerRef.current);
       baseLayerRef.current = null;
-    }
-    if (targetProj === "EPSG:3857") {
-      const base = new TileLayer({ source: new OSM(), zIndex: 0 });
-      baseLayerRef.current = base;
-      map.getLayers().insertAt(0, base);
     }
 
     setTimeout(() => map.updateSize(), 0);
   };
-
-  // Inicializar mapa con la capa por defecto
   useEffect(() => {
-    if (!mapDivRef.current) return;
+    if (!mapDivRef.current || !active) return;
+    if (mapRef.current) return;
 
-    const initProj: "EPSG:3857" | "EPSG:4326" =
-      (hash.p as any) ?? (defaultLayer.kind === "gibs" ? "EPSG:3857" : "EPSG:4326");
+    const desiredProj = hash.p && SUPPORTED_PROJECTIONS.has(hash.p) ? (hash.p as "EPSG:3857" | "EPSG:4326") : (active.projection === "EPSG:4326" ? "EPSG:4326" : "EPSG:3857");
 
     const view = new View({
-      projection: initProj,
+      projection: desiredProj,
       center:
         hash.lon !== undefined && hash.lat !== undefined
-          ? transform([hash.lon, hash.lat], "EPSG:4326", initProj)
-          : transform([0, 0], "EPSG:4326", initProj),
+          ? transform([hash.lon, hash.lat], "EPSG:4326", desiredProj)
+          : transform([0, 0], "EPSG:4326", desiredProj),
       zoom: hash.z ?? 2,
+      maxZoom: active.maxZoom ?? (desiredProj === "EPSG:4326" ? 10 : 14),
     });
 
     const map = new Map({
@@ -398,38 +450,42 @@ export default function App() {
       controls: defaultControls({ zoom: true, rotate: true, attribution: false }).extend([new ScaleLine()]),
     });
 
-    if (initProj === "EPSG:3857") {
+    if (desiredProj === "EPSG:3857") {
       const base = new TileLayer({ source: new OSM(), zIndex: 0 });
       baseLayerRef.current = base;
       map.addLayer(base);
     }
 
-    // Anotaciones
     const annotationsSource = new VectorSource();
     annotationsSourceRef.current = annotationsSource;
     const annotations = new VectorLayer({ source: annotationsSource, style: annotationsStyle, zIndex: 2 });
     map.addLayer(annotations);
 
-    // Imagery inicial
-    const imagery = makeImageryLayerREST(defaultLayer);
+    const imagery = makeImageryLayer(active);
     imageryLayerRef.current = imagery;
     map.addLayer(imagery);
 
-    // Eventos
-    const onMove = () => writeHash(map.getView(), dateRef.current, layerKey(active));
+    const onMove = () => {
+      const layer = activeRef.current;
+      if (!layer) return;
+      writeHash(map.getView(), dateRef.current || layerDefaultDate(layer, todayISO()), layer.layerKey);
+      scheduleFetchAnnotations();
+    };
+
     const onPointerMove = (evt: any) => {
       const proj = map.getView().getProjection().getCode();
       const [lon, lat] = transform(evt.coordinate, proj, "EPSG:4326");
       setCursorCoord({ lon, lat });
     };
+
     map.on("moveend", onMove);
     map.on("pointermove", onPointerMove);
 
-    // Proyección correcta (por si el hash pedía otra)
-    ensureProjection(defaultLayer.kind === "gibs" ? "EPSG:3857" : "EPSG:4326");
+    ensureProjection(active, true);
 
     mapRef.current = map;
     setTimeout(() => map.updateSize(), 0);
+    scheduleFetchAnnotations();
 
     return () => {
       map.un("moveend", onMove);
@@ -440,13 +496,10 @@ export default function App() {
       map.setTarget(undefined);
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Cambios de fecha (GIBS) o capa → reemplazar source / reproyectar si aplica
+  }, [active, annotationsStyle, hash.lat, hash.lon, hash.p, hash.z]);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !active) return;
 
     const replaceImagery = (newLayer: TileLayer<any>) => {
       const old = imageryLayerRef.current;
@@ -456,28 +509,18 @@ export default function App() {
       }
       imageryLayerRef.current = newLayer;
       map.addLayer(newLayer);
-      writeHash(map.getView(), dateRef.current, layerKey(active));
+      writeHash(map.getView(), dateRef.current || layerDefaultDate(active, todayISO()), active.layerKey);
     };
 
-    const targetProj = active.kind === "gibs" ? "EPSG:3857" : "EPSG:4326";
-    ensureProjection(targetProj);
+    ensureProjection(active);
+    const lyr = makeImageryLayer(active);
+    replaceImagery(lyr);
+    scheduleFetchAnnotations();
+  }, [active, date]);
 
-    if (active.kind === "gibs") {
-      const lyr = makeImageryLayerREST(active);
-      replaceImagery(lyr);
-    } else {
-      const lyr = makeImageryLayerREST(active);
-      replaceImagery(lyr);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, active]);
-
-  // Opacidad
   useEffect(() => {
     if (imageryLayerRef.current) imageryLayerRef.current.setOpacity(opacity);
   }, [opacity]);
-
-  /* ================= Interacciones ================= */
   const disableDraw = () => {
     if (!mapRef.current) return;
     if (drawRef.current) { mapRef.current.removeInteraction(drawRef.current); drawRef.current = null; }
@@ -494,7 +537,7 @@ export default function App() {
     const draw = new Draw({ source: annotationsSourceRef.current, type });
     draw.on("drawend", (evt) => {
       const f = evt.feature;
-      const name = window.prompt("Nombre/etiqueta para esta anotación:", "") ?? "";
+      const name = window.prompt("Nombre para la anotacion:", "") ?? "";
       f.set("name", name);
 
       const g = f.getGeometry();
@@ -510,6 +553,7 @@ export default function App() {
         f.set("coords", coords);
       }
       setAnnotKey((k) => k + 1);
+      schedulePersistAnnotations();
     });
     mapRef.current.addInteraction(draw);
     drawRef.current = draw;
@@ -522,12 +566,12 @@ export default function App() {
     const modify = new Modify({ features: select.getFeatures() });
     mapRef.current.addInteraction(select);
     mapRef.current.addInteraction(modify);
+    modify.on("modifyend", schedulePersistAnnotations);
     selectRef.current = select;
     modifyRef.current = modify;
     setIsModifyOn(true);
   };
 
-  // Borrar selección o última
   const deleteSelected = () => {
     if (!annotationsSourceRef.current) return;
     const sel = selectRef.current?.getFeatures();
@@ -541,13 +585,12 @@ export default function App() {
       if (feats.length > 0) annotationsSourceRef.current.removeFeature(feats[feats.length - 1]);
     }
     setAnnotKey((k) => k + 1);
+    schedulePersistAnnotations();
   };
 
-  // Export/Import GeoJSON (EPSG:4326)
   const exportGeoJSON = () => {
     if (!annotationsSourceRef.current) return;
-    const format = new GeoJSON();
-    const json = format.writeFeatures(annotationsSourceRef.current.getFeatures(), {
+    const json = geoJsonFormat.writeFeatures(annotationsSourceRef.current.getFeatures(), {
       featureProjection: mapRef.current?.getView().getProjection().getCode() || "EPSG:3857",
       dataProjection: "EPSG:4326",
       decimals: 6,
@@ -558,43 +601,55 @@ export default function App() {
     a.href = url; a.download = `annotations_${Date.now()}.geojson`; a.click();
     URL.revokeObjectURL(url);
   };
+
   const importGeoJSON = (file: File) => {
     if (!annotationsSourceRef.current) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const text = String(reader.result);
-        const format = new GeoJSON();
-        const features = format.readFeatures(text, {
+        const features = geoJsonFormat.readFeatures(text, {
           dataProjection: "EPSG:4326",
           featureProjection: mapRef.current?.getView().getProjection().getCode() || "EPSG:3857",
         });
+        skipPersistRef.current = true;
         annotationsSourceRef.current!.addFeatures(features);
+        skipPersistRef.current = false;
         setAnnotKey((k) => k + 1);
-      } catch { alert("No se pudo importar el GeoJSON."); }
+        schedulePersistAnnotations();
+      } catch {
+        skipPersistRef.current = false;
+        alert("No se pudo importar el GeoJSON.");
+      }
     };
     reader.readAsText(file);
   };
-
-  // Lista de anotaciones + filtro
   const [annotKey, setAnnotKey] = useState(0);
   useEffect(() => {
-    if (!annotationsSourceRef.current) return;
-    const fn = () => setAnnotKey((k) => k + 1);
-    annotationsSourceRef.current.on("addfeature", fn);
-    annotationsSourceRef.current.on("removefeature", fn);
+    const source = annotationsSourceRef.current;
+    if (!source) return;
+    const handleChange = () => {
+      setAnnotKey((k) => k + 1);
+      if (!skipPersistRef.current) schedulePersistAnnotations();
+    };
+    source.on("addfeature", handleChange);
+    source.on("removefeature", handleChange);
+    source.on("changefeature", handleChange);
     return () => {
-      annotationsSourceRef.current?.un("addfeature", fn);
-      annotationsSourceRef.current?.un("removefeature", fn);
+      source.un("addfeature", handleChange);
+      source.un("removefeature", handleChange);
+      source.un("changefeature", handleChange);
     };
   }, []);
+
   const annotationsList = useMemo(() => {
     if (!annotationsSourceRef.current || !mapRef.current) return [];
     const proj = mapRef.current.getView().getProjection().getCode();
     const items = annotationsSourceRef.current.getFeatures().map((f, i) => {
       const raw = f.get("name");
-      const name = (typeof raw === "string" && raw.length > 0) ? raw : `Anotación ${i + 1}`;
-      let lon = NaN, lat = NaN;
+      const name = typeof raw === "string" && raw.length > 0 ? raw : `Anotacion ${i + 1}`;
+      let lon = NaN;
+      let lat = NaN;
       const geom = f.getGeometry();
       if (geom) {
         let pos: [number, number];
@@ -613,46 +668,44 @@ export default function App() {
     return items.filter((it) => it.name.toLowerCase().includes(q));
   }, [annotKey, filter]);
 
-  // Utilidades UI
   const flyToFeature = (f: Feature) => {
     if (!mapRef.current) return;
-    const geom = f.getGeometry(); const view = mapRef.current.getView();
+    const geom = f.getGeometry();
+    const view = mapRef.current.getView();
     if (!geom || !view) return;
     view.fit(geom.getExtent(), { duration: 400, maxZoom: 10, padding: [48, 48, 48, 48] });
   };
+
   const resetView = () => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !active) return;
     const proj = mapRef.current.getView().getProjection().getCode();
     mapRef.current.getView().animate({ center: transform([0, 0], "EPSG:4326", proj), zoom: 2, duration: 350 });
   };
-  const copyCoords = async (lon: number, lat: number) => {
-    try { await navigator.clipboard.writeText(`${lon.toFixed(5)}, ${lat.toFixed(5)}`); } catch {}
-  };
 
-  /* ===== Layers para Navbar: SOLO del mismo “dominio” ===== */
-  const layersForNavbar = useMemo(() => {
-    if (active.kind === "gibs") {
-      return GIBS_LAYERS.map((l) => ({ id: layerKey(l), title: l.title }));
+  const copyCoords = async (lon: number, lat: number) => {
+    try {
+      await navigator.clipboard.writeText(`${lon.toFixed(5)}, ${lat.toFixed(5)}`);
+    } catch {
+      // noop
     }
-    // mismo cuerpo treks
-    return TREK_LAYERS.filter((t) => t.body === active.body)
-      .map((l) => ({ id: layerKey(l), title: l.title }));
-  }, [active]);
+  };
+  const layersForNavbar: LayerOption[] = useMemo(() => {
+    if (!catalog || !active) return [];
+    const byBodyLower = catalog[active.body.toLowerCase()];
+    const byBody = catalog[active.body];
+    const list = byBodyLower ?? byBody ?? [];
+    return list.map((l) => ({ id: l.layerKey, title: l.title }));
+  }, [catalog, active]);
 
   const handleChangeLayer = (key: string) => {
-    const next = LAYERS.find((l) => layerKey(l) === key);
+    if (!active) return;
+    const next = allLayers.find((layer) => layer.layerKey === key);
     if (!next) return;
-
-    // Bloquear cambios de planeta: debe pertenecer al mismo dominio
-    const sameDomain =
-      (active.kind === "gibs" && next.kind === "gibs") ||
-      (active.kind === "trek" && next.kind === "trek" && next.body === active.body);
-
-    if (!sameDomain) return; // ignorar silenciosamente
+    if (next.body.toLowerCase() !== active.body.toLowerCase()) return;
 
     setActive(next);
+    scheduleFetchAnnotations();
     if (drawMode === "Point" || drawMode === "Polygon") {
-      // recrear interacción por si cambió proyección
       disableDraw();
       enableDraw(drawMode);
     }
@@ -664,36 +717,52 @@ export default function App() {
     else disableDraw();
   };
 
-  // Atajos de teclado
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+      if (fetchTimeoutRef.current) window.clearTimeout(fetchTimeoutRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "p")      handleSetDrawMode("Point");
+      if (e.key.toLowerCase() === "p") handleSetDrawMode("Point");
       else if (e.key.toLowerCase() === "g") handleSetDrawMode("Polygon");
       else if (e.key.toLowerCase() === "n") handleSetDrawMode("None");
       else if (e.key.toLowerCase() === "e") toggleModify();
-      else if (e.key === "Delete")          deleteSelected();
+      else if (e.key === "Delete") deleteSelected();
       else if (e.key.toLowerCase() === "r") resetView();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModifyOn, drawMode, active]);
+  if (!active) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100">
+        {catalogError
+          ? `No se pudo cargar el catalogo de capas: ${catalogError}`
+          : catalogLoading
+            ? "Cargando catalogo de capas..."
+            : "No hay capas disponibles."}
+      </div>
+    );
+  }
 
-  /* ============== RENDER ============== */
+  const isDateDisabled = !layerNeedsDate(active);
+
   return (
     <div className="h-full w-full relative">
-      {/* Mapa full-screen (debajo del navbar) */}
       <div ref={mapDivRef} className="fixed left-0 right-0 bottom-0" style={{ top: "var(--navbar-h)" }} />
 
-      {/* NAVBAR (tu componente intacto, ahora con opciones filtradas) */}
       <Navbar
         headerRef={headerRef as MutableRefObject<HTMLElement | null>}
         tilePending={tilePending}
-        layerId={layerKey(active)}
+        layerId={active.layerKey}
         layers={layersForNavbar}
         onChangeLayer={handleChangeLayer}
         date={date}
         onChangeDate={setDate}
+        isDateDisabled={isDateDisabled}
         drawMode={drawMode}
         onSetDrawMode={handleSetDrawMode}
         isModifyOn={isModifyOn}
@@ -707,7 +776,6 @@ export default function App() {
         cursorCoord={cursorCoord}
       />
 
-      {/* Panel lateral (anotaciones) */}
       <aside
         className="fixed right-4 z-40 w-80 max-w-[90vw] bg-white/80 backdrop-blur border border-slate-200 rounded-xl shadow-xl p-3 flex flex-col"
         style={{ top: "calc(var(--navbar-h) + 12px)", height: "calc(100vh - var(--navbar-h) - 24px)" }}
@@ -716,21 +784,31 @@ export default function App() {
           <div className="font-extrabold text-slate-900 text-sm">Anotaciones</div>
           <div className="ml-auto" />
           <input
-            placeholder="Filtrar…"
+            placeholder="Filtrar..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="px-2 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
           />
         </div>
 
-        <div className="text-[11px] text-rose-600 mb-2">
-          {tileErrors > 0 ? `Errores de carga: ${tileErrors}` : " "}
+        <div className="text-[11px] mb-2">
+          {annotationsError ? (
+            <span className="text-rose-600">Anotaciones: {annotationsError}</span>
+          ) : annotationsLoading ? (
+            <span className="text-slate-500">Cargando anotaciones...</span>
+          ) : annotationsSaving ? (
+            <span className="text-slate-500">Guardando anotaciones...</span>
+          ) : tileErrors > 0 ? (
+            <span className="text-rose-600">Errores de carga: {tileErrors}</span>
+          ) : (
+            <span className="text-slate-400"> </span>
+          )}
         </div>
 
         <div className="overflow-auto min-h-0">
           {annotationsList.length === 0 ? (
             <div className="text-sm text-slate-600">
-              No hay anotaciones. Usa <b>Punto</b> o <b>Polígono</b>.
+              No hay anotaciones. Usa <b>Punto</b> o <b>Poligono</b>.
             </div>
           ) : (
             <ul className="space-y-2">
@@ -741,7 +819,7 @@ export default function App() {
                     <span className="text-xs text-slate-500">{type}</span>
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
-                    {Number.isFinite(lon) && Number.isFinite(lat) ? `${lon.toFixed(4)}, ${lat.toFixed(4)}` : "—"}
+                    {Number.isFinite(lon) && Number.isFinite(lat) ? `${lon.toFixed(4)}, ${lat.toFixed(4)}` : "--"}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={() => flyToFeature(feature)} className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50">Ir</button>
@@ -749,8 +827,8 @@ export default function App() {
                       onClick={() => {
                         const newName = window.prompt("Cambiar nombre:", name) ?? name;
                         feature.set("name", newName);
-                        // refrescar lista
                         setFilter((f) => f + "");
+                        schedulePersistAnnotations();
                       }}
                       className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
                     >Renombrar</button>
@@ -764,7 +842,7 @@ export default function App() {
                         setAnnotKey((k) => k + 1);
                       }}
                       className="px-2 py-1 text-xs rounded border border-rose-300 bg-rose-100 hover:bg-rose-200"
-                      title="Borrar esta anotación"
+                      title="Borrar esta anotacion"
                     >Borrar</button>
                   </div>
                 </li>
@@ -774,14 +852,17 @@ export default function App() {
         </div>
 
         <div className="mt-3 text-[11px] text-slate-500">
-          Imagery © NASA EOSDIS GIBS / Worldview · NASA Solar System Treks
+          Imagery - NASA EOSDIS GIBS / NASA Solar System Treks
         </div>
       </aside>
 
-      {/* Pie discreto */}
       <div className="fixed bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 border border-slate-200 rounded-md px-2 py-1 shadow-sm">
-        Escala en la esquina del mapa · Atajos: P/G/N/E/Del/R
+        Escala en la esquina del mapa - Atajos: P/G/N/E/Del/R
       </div>
     </div>
   );
 }
+
+
+
+

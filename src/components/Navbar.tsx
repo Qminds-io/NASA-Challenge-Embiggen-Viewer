@@ -1,4 +1,4 @@
-import type { MutableRefObject } from "react";
+﻿import type { MutableRefObject } from "react";
 
 type LayerOption = { id: string; title: string };
 type Coord = { lon: number; lat: number } | null;
@@ -14,6 +14,7 @@ type Props = {
 
   date: string;
   onChangeDate: (v: string) => void;
+  isDateDisabled?: boolean;
 
   drawMode: DrawMode;
   onSetDrawMode: (m: DrawMode) => void;
@@ -40,6 +41,7 @@ export default function Navbar({
   onChangeLayer,
   date,
   onChangeDate,
+  isDateDisabled = false,
   drawMode,
   onSetDrawMode,
   isModifyOn,
@@ -87,7 +89,8 @@ export default function Navbar({
             type="date"
             value={date}
             onChange={(e) => onChangeDate(e.target.value)}
-            className="px-2.5 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
+            disabled={isDateDisabled}
+            className={`px-2.5 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 ${isDateDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
             title="Fecha (YYYY-MM-DD)"
           />
 
@@ -102,9 +105,9 @@ export default function Navbar({
             >Punto</button>
             <button
               onClick={() => onSetDrawMode("Polygon")}
-              title="Polígono (G)"
+              title="Poligono (G)"
               className={`px-3 py-1.5 text-sm ${drawMode === "Polygon" ? "bg-sky-100 border-r border-slate-300" : "border-r border-slate-300 hover:bg-slate-50"}`}
-            >Polígono</button>
+            >Poligono</button>
             <button
               onClick={() => onSetDrawMode("None")}
               title="Ninguno (N)"
@@ -123,7 +126,7 @@ export default function Navbar({
           </button>
           <button
             onClick={onDeleteSelected}
-            title="Borrar selección (Del)"
+            title="Borrar seleccion (Del)"
             className="px-3 py-1.5 text-sm rounded-md border border-rose-300 bg-rose-100 hover:bg-rose-200"
           >
             Borrar
@@ -165,7 +168,7 @@ export default function Navbar({
               title="Recentrar (R)"
             >Recentrar</button>
             <div className="text-[11px] text-slate-500">
-              {cursorCoord ? `Cursor: ${cursorCoord.lon.toFixed(4)}, ${cursorCoord.lat.toFixed(4)}` : "Cursor: —"}
+              {cursorCoord ? `Cursor: ${cursorCoord.lon.toFixed(4)}, ${cursorCoord.lat.toFixed(4)}` : "Cursor: --"}
             </div>
           </div>
         </div>
