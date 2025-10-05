@@ -1,11 +1,21 @@
 import { useNavigate } from "react-router-dom";
 
+/* ========= config logo ========= */
+const LOGO_SRC = "/Logo.png"; // ← pon aquí la ruta real de tu logo (SVG/PNG)
+
 /* ========= util ========= */
 function todayISO() {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 10);
+}
+
+/** Devuelve el delay negativo en segundos para sincronizar la animación con el tiempo real */
+function realTimeDelaySeconds(durationSec: number): string {
+  const nowSec = Date.now() / 1000;
+  const progress = nowSec % durationSec; // [0, durationSec)
+  return `-${progress}s`; // arranca “adelantado” a la posición actual
 }
 
 /** Config genérica de cuerpos */
@@ -130,7 +140,7 @@ const BODIES: BodyConfig[] = [
     theme: "earth",
   },
 
-  // ——— Planetas/moons “próximamente” (deshabilitados para no romper el visor) ———
+  // ——— Planetas/moons “próximamente” ———
   {
     id: "Mercury",
     name: "Mercurio",
@@ -144,7 +154,7 @@ const BODIES: BodyConfig[] = [
     id: "Venus",
     name: "Venus",
     emoji: "♀️",
-    ring: 1.6 as any, // solo visual
+    ring: 1.6 as any,
     enabled: false,
     tooltip: { title: "Venus", lines: ["Próximamente."] },
     theme: "venus",
@@ -214,22 +224,26 @@ export default function SolarSystem() {
       {/* Encabezado */}
       <div className="max-w-6xl mx-auto px-4 pt-6">
         <div className="flex items-center gap-3">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_0_6px_rgba(56,189,248,0.25)]" />
+          {/* === Logo a la izquierda del título === */}
+          <img
+            src={LOGO_SRC}
+            alt="Quantic View logo"
+            className="h-20 w-20 rounded-md shadow-sm object-contain"
+            loading="eager"
+            decoding="async"
+          />
           <h1 className="text-xl font-extrabold tracking-tight">
-            Embiggen Viewer — Sistema Solar
+            Quantic View — Solar System
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-300">
-          Toca un cuerpo para abrir el visor con su capa predeterminada. En el visor podrás cambiar capas del mismo cuerpo.
+          Tap a body to open the viewer with its default layer. In the viewer, you can change layers for the same body.
         </p>
       </div>
 
       {/* Diagrama orbital (md+) */}
       <div className="hidden md:block">
-        <SolarDiagram
-          bodies={BODIES}
-          onOpen={openBody}
-        />
+        <SolarDiagram bodies={BODIES} onOpen={openBody} />
       </div>
 
       {/* Fallback móvil: tarjetas solo de habilitados */}
@@ -251,7 +265,6 @@ export default function SolarSystem() {
               }
             />
           ))}
-          {/* También mostramos la Luna */}
           {enabledMoons.map((m) => (
             <PlanetCard
               key={m.id}
@@ -269,7 +282,7 @@ export default function SolarSystem() {
         </div>
       </div>
 
-      {/* CSS embebido para las animaciones */}
+      {/* CSS embebido */}
       <style>{css}</style>
     </div>
   );
@@ -284,13 +297,10 @@ function SolarDiagram({
   bodies: BodyConfig[];
   onOpen: (b: BodyConfig) => void;
 }) {
-  // Solo renderizamos órbitas para cuerpos no-luna
   const planets = bodies.filter((b) => !b.isMoonOf && b.id !== "Sun");
-  // Órbitas únicas
-  const rings = Array.from(
-    new Set(planets.map((p) => p.ring ?? 0))
-  ).sort((a, b) => a - b);
-
+  const rings = Array.from(new Set(planets.map((p) => p.ring ?? 0))).sort(
+    (a, b) => a - b
+  );
   const earthMoons = bodies.filter((b) => b.isMoonOf === "Earth");
 
   return (
@@ -298,64 +308,78 @@ function SolarDiagram({
       className="relative mx-auto mt-8 mb-16"
       style={{ width: "min(92vmin, 900px)", height: "min(92vmin, 900px)" }}
     >
-      {/* Sol al centro */}
+      {/* Sol */}
       <div className="solar-center">
         <div className="sun-glow" />
         <div className="sun-core" />
       </div>
 
-      {/* Órbitas grandes */}
+      {/* Órbitas */}
       {rings.map((ring) => {
         const radius = ringRadius(ring);
-        const dur = ringDuration(ring);
+        const durSec = durationSeconds(ring);
+        const durStr = `${durSec}s`;
+        const planetsInRing = planets.filter((p) => (p.ring ?? -1) === ring);
+
         return (
           <div
             key={`ring-${ring}`}
             className="orbit"
             style={{ width: radius, height: radius }}
           >
-            {/* Cada planeta en esta órbita */}
-            {planets
-              .filter((p) => (p.ring ?? -1) === ring)
-              .map((p, idx) => {
-                // Desfasar cada planeta de la misma órbita
-                const extraRotate = (idx * 360) / Math.max(1, planets.filter(pl => (pl.ring ?? -1) === ring).length);
-                return (
-                  <div
-                    key={p.id}
-                    className="rotator"
-                    style={{ animationDuration: dur, transform: `rotate(${extraRotate}deg)` }}
-                  >
-                    <div className="anchor">
-                      <div
-                        className="counter"
-                        style={{ animation: `spin-rev ${dur} linear infinite` }}
-                      >
-                        <Tooltip title={p.tooltip.title} lines={p.tooltip.lines}>
-                          <PlanetButton
-                            label={p.name}
-                            caption={p.label ?? ""}
-                            emoji={p.emoji}
-                            onClick={() => onOpen(p)}
-                            theme={p.theme ?? "earth"}
-                            disabled={!p.enabled}
-                          />
-                        </Tooltip>
+            {planetsInRing.map((p, idx) => {
+              const extraRotate =
+                (idx * 360) / Math.max(1, planetsInRing.length);
+              const delay = realTimeDelaySeconds(durSec);
 
-                        {/* Sub-órbitas: solo mostramos la Luna alrededor de la Tierra por ahora */}
-                        {p.id === "Earth" &&
-                          earthMoons.map((m) => (
+              return (
+                <div
+                  key={p.id}
+                  className="rotator"
+                  style={{
+                    animationDuration: durStr,
+                    animationDelay: delay,
+                    transform: `rotate(${extraRotate}deg)`,
+                  }}
+                >
+                  <div className="anchor">
+                    <div
+                      className="counter"
+                      style={{
+                        animation: `spin-rev ${durStr} linear infinite`,
+                        animationDelay: delay,
+                      }}
+                    >
+                      <PlanetButton
+                        id={p.id}
+                        label={p.name}
+                        caption={p.label ?? ""}
+                        emoji={p.emoji}
+                        onClick={() => onOpen(p)}
+                        theme={p.theme ?? "earth"}
+                        disabled={!p.enabled}
+                      />
+
+                      {/* Sub-órbita Luna */}
+                      {p.id === "Earth" &&
+                        earthMoons.map((m) => {
+                          const moonDurSec = 18;
+                          const moonDelay = realTimeDelaySeconds(moonDurSec);
+                          return (
                             <SubOrbitMoon
                               key={m.id}
                               moon={m}
                               onOpen={() => onOpen(m)}
+                              animDurationSec={moonDurSec}
+                              animDelay={moonDelay}
                             />
-                          ))}
-                      </div>
+                          );
+                        })}
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
           </div>
         );
       })}
@@ -371,21 +395,38 @@ function SolarDiagram({
 function SubOrbitMoon({
   moon,
   onOpen,
+  animDurationSec,
+  animDelay,
 }: {
   moon: BodyConfig;
   onOpen: () => void;
+  animDurationSec: number;
+  animDelay: string;
 }) {
-  // radio y velocidad de sub-órbita (estáticos por estética)
   const subR = "9vmin";
-  const dur = "18s";
+  const dur = `${animDurationSec}s`;
+
   return (
     <div className="suborbit" style={{ width: subR, height: subR }}>
-      <div className="subrotator" style={{ animationDuration: dur }}>
+      <div
+        className="subrotator"
+        style={{ animationDuration: dur, animationDelay: animDelay }}
+      >
         <div className="subanchor">
-          <div className="counter" style={{ animation: `spin-rev ${dur} linear infinite` }}>
-            <Tooltip title={moon.tooltip.title} lines={moon.tooltip.lines} size="sm">
-              <MiniMoonButton emoji={moon.emoji} title={moon.name} onClick={onOpen} disabled={!moon.enabled} />
-            </Tooltip>
+          <div
+            className="counter"
+            style={{
+              animation: `spin-rev ${dur} linear infinite`,
+              animationDelay: animDelay,
+            }}
+          >
+            <MiniMoonButton
+              emoji={moon.emoji}
+              title={moon.name}
+              caption={moon.label ?? ""}
+              onClick={onOpen}
+              disabled={!moon.enabled}
+            />
           </div>
         </div>
       </div>
@@ -393,44 +434,10 @@ function SubOrbitMoon({
   );
 }
 
-/* =============== Tooltips =============== */
-
-function Tooltip({
-  title,
-  lines,
-  children,
-  size = "md",
-}: {
-  title: string;
-  lines: string[];
-  children: React.ReactNode;
-  size?: "sm" | "md";
-}) {
-  return (
-    <div className="relative group inline-flex">
-      {children}
-      <div
-        role="tooltip"
-        className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -top-2 translate-y-[-100%] 
-        rounded-lg border border-white/15 bg-slate-900/90 backdrop-blur px-3 py-2 shadow-2xl opacity-0 
-        group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 z-50
-        ${size === "sm" ? "w-44" : "w-64"}`}
-      >
-        <div className="text-[13px] font-semibold text-slate-100">{title}</div>
-        <ul className="mt-1 text-[11px] text-slate-300 space-y-0.5">
-          {lines.map((l, i) => (
-            <li key={i} className="leading-snug">{l}</li>
-          ))}
-        </ul>
-        <div className="absolute left-1/2 top-full -translate-x-1/2 w-3 h-3 rotate-45 bg-slate-900/90 border-r border-b border-white/15"></div>
-      </div>
-    </div>
-  );
-}
-
-/* =============== Botones =============== */
+/* =============== Botones con "emoji + card on hover" =============== */
 
 function PlanetButton({
+  id,
   label,
   caption,
   emoji,
@@ -438,6 +445,7 @@ function PlanetButton({
   theme,
   disabled = false,
 }: {
+  id?: BodyId; // <-- para poder detectar Earth en CSS
   label: string;
   caption: string;
   emoji: string;
@@ -459,43 +467,74 @@ function PlanetButton({
       : "ring-indigo";
 
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`planet-btn ${themeClass} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-      title={label}
-      aria-disabled={disabled}
-    >
-      <div className="text-2xl leading-none">{emoji}</div>
-      <div className="mt-1 font-semibold text-sm">{label}</div>
-      <div className="text-[11px] opacity-80">{caption}</div>
-      {!caption && <div className="text-[11px] opacity-60">Próximamente</div>}
-    </button>
+    <div className="planet-wrap group inline-flex items-center justify-center">
+      {/* Emoji visible */}
+      <button
+        data-id={id}       // <= identificamos la Tierra
+        onClick={onClick}
+        disabled={disabled}
+        className={`planet-emoji-btn ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        title={label}
+        aria-disabled={disabled}
+      >
+        <span className="text-2xl leading-none">{emoji}</span>
+        <span className="sr-only">{label}</span>
+      </button>
+
+      {/* Card (aparece al hover del emoji o de la card) */}
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`planet-card ${themeClass} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        aria-hidden={disabled ? "true" : "false"}
+        tabIndex={-1}
+      >
+        <div className="font-semibold text-sm">{label}</div>
+        <div className="text-[11px] opacity-80">{caption || "Próximamente"}</div>
+      </button>
+    </div>
   );
 }
 
 function MiniMoonButton({
   emoji,
   title,
+  caption,
   onClick,
   disabled = false,
 }: {
   emoji: string;
   title: string;
+  caption: string;
   onClick: () => void;
   disabled?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`moon-btn ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-      title={title}
-      aria-disabled={disabled}
-    >
-      <span className="text-xl">{emoji}</span>
-      <span className="sr-only">{title}</span>
-    </button>
+    <div className="planet-wrap group inline-flex items-center justify-center">
+      {/* Emoji luna visible */}
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`moon-emoji-btn ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        title={title}
+        aria-disabled={disabled}
+      >
+        <span className="text-xl">{emoji}</span>
+        <span className="sr-only">{title}</span>
+      </button>
+
+      {/* Card de luna */}
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`moon-card ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        aria-hidden={disabled ? "true" : "false"}
+        tabIndex={-1}
+      >
+        <div className="text-[13px] font-semibold text-slate-100">{title}</div>
+        <div className="text-[11px] opacity-80">{caption || "Próximamente"}</div>
+      </button>
+    </div>
   );
 }
 
@@ -539,23 +578,27 @@ function PlanetCard({
 
 /** Tamaño de órbita en función del índice (vmin) */
 function ringRadius(ring: number | undefined): string {
-  const base = 30;   // vmin
-  const step = 12;   // vmin
+  const base = 30; // vmin
+  const step = 12; // vmin
   const r = base + step * (Number(ring ?? 1) - 1);
   return `${r}vmin`;
 }
 
-/** Duración de rotación (más lejana = más lenta) */
-function ringDuration(ring: number | undefined): string {
+/** Duración (más lejana = más lenta) en segundos como número */
+function durationSeconds(ring: number | undefined): number {
   const base = 120; // s
-  const step = 60;  // s
-  const d = base + step * (Number(ring ?? 1) - 1);
-  return `${d}s`;
+  const step = 60; // s
+  return base + step * (Number(ring ?? 1) - 1);
 }
 
 /* =============== CSS específico del diagrama =============== */
 
 const css = `
+:root{
+  --planet-emoji-size: 2.8rem; /* ajustar si quieres aún más/menos solape */
+  --moon-emoji-size:   2.4rem;
+}
+
 /* Centro del sistema */
 .solar-center {
   position: absolute;
@@ -581,6 +624,9 @@ const css = `
   z-index: 1;
 }
 
+/* ✅ Desactivar captura de eventos del Sol y su halo */
+.solar-center, .sun-core, .sun-glow { pointer-events: none; }
+
 /* Órbitas (anillos) */
 .orbit {
   position: absolute;
@@ -589,19 +635,17 @@ const css = `
   border: 1px dashed rgba(148, 163, 184, 0.35);
   border-radius: 9999px;
   transform: translate(-50%, -50%);
-  pointer-events: none; /* no bloquear clics sobre planetas */
+  pointer-events: none; /* no bloquear clics de planetas */
 }
 
-/* Rotadores (giran alrededor del centro) */
+/* Rotadores */
 .rotator {
   position: absolute;
   inset: 0;
   transform-origin: 50% 50%;
   animation: spin 120s linear infinite;
 }
-.counter {
-  transform-origin: center;
-}
+.counter { transform-origin: center; }
 
 /* Punto de anclaje en el borde derecho de la órbita */
 .anchor {
@@ -611,21 +655,70 @@ const css = `
   transform: translate(-50%, -50%);
 }
 
-/* Sub-órbita (Luna) */
+/* Sub-órbita (Luna) — permitir clics en su interior sin tapar la Tierra */
 .suborbit {
   position: absolute;
   top: 0; left: 0;
   transform: translate(-50%, -50%);
   border: 1px dashed rgba(148,163,184,0.3);
   border-radius: 9999px;
-  pointer-events: none; /* no bloquear clics sobre la luna */
+  pointer-events: auto; /* mantiene la Luna interactiva */
+  z-index: 5;          /* por debajo del planeta elevamos el planeta a 10 */
 }
 .subrotator { position: absolute; inset: 0; transform-origin: 50% 50%; animation: spin 18s linear infinite; }
 .subanchor { position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%); }
 
-/* Botones planeta */
-.planet-btn {
-  pointer-events: auto; /* asegurar que el botón sí reciba el clic */
+/* ====== Emoji + Card en hover (más preciso) ====== */
+.planet-wrap{
+  position: relative;
+  isolation: isolate; /* aísla z-index local */
+  z-index: 10;        /* <= default por encima de sub-órbita */
+}
+.planet-wrap:hover,
+.planet-wrap:focus-within{
+  z-index: 99; /* eleva sobre vecinos para click fácil */
+}
+
+/* Botón emoji planeta — hitbox reducido */
+.planet-emoji-btn {
+  position: relative; /* necesario para el ::after del hitbox */
+  width: var(--planet-emoji-size);
+  height: var(--planet-emoji-size);
+  display: grid;
+  place-items: center;
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #e2e8f0;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+  pointer-events: auto;
+  z-index: 10;
+  line-height: 1;
+  outline-offset: 2px;
+}
+.planet-emoji-btn:hover:not([aria-disabled="true"]) {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.09);
+  border-color: rgba(125, 211, 252, 0.45);
+}
+
+/* === Hitbox invisible EXTRA solo para la Tierra === */
+.planet-emoji-btn[data-id="Earth"]::after{
+  content: "";
+  position: absolute;
+  inset: -8px;           /* expande ~8px todo alrededor */
+  border-radius: 9999px;
+  /* sin fondo ni borde: invisible */
+  pointer-events: auto;  /* capta el click y lo delega al botón */
+}
+
+/* Card de planeta — SOLO aparece con hover/focus en el emoji o en la card */
+.planet-card {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  transform: translateX(-50%);
   min-width: 10.5rem;
   max-width: 15rem;
   padding: 0.6rem 0.8rem;
@@ -636,13 +729,21 @@ const css = `
   color: #e2e8f0;
   text-align: left;
   box-shadow: 0 8px 28px rgba(0,0,0,0.35);
-  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+  transition: opacity 160ms ease, transform 160ms ease;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 50;
 }
-.planet-btn:hover:not([aria-disabled="true"]) {
-  transform: translateY(-2px);
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(125, 211, 252, 0.45);
+.planet-emoji-btn:hover + .planet-card,
+.planet-emoji-btn:focus-visible + .planet-card,
+.planet-card:hover,
+.planet-card:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(-2px);
 }
+
+/* Aros de color para card */
 .ring-emerald { box-shadow: 0 0 0 4px rgba(16,185,129,0.16) inset; }
 .ring-rose    { box-shadow: 0 0 0 4px rgba(244,63,94,0.16) inset; }
 .ring-cyan    { box-shadow: 0 0 0 4px rgba(34,211,238,0.16) inset; }
@@ -650,11 +751,10 @@ const css = `
 .ring-amber   { box-shadow: 0 0 0 4px rgba(245,158,11,0.16) inset; }
 .ring-indigo  { box-shadow: 0 0 0 4px rgba(99,102,241,0.16) inset; }
 
-/* Botón Luna (compacto) */
-.moon-btn {
-  pointer-events: auto; /* asegurar que el botón sí reciba el clic */
-  width: 3.3rem;
-  height: 3.3rem;
+/* Emoji Luna — hitbox reducido (se mantiene) */
+.moon-emoji-btn {
+  width: var(--moon-emoji-size);
+  height: var(--moon-emoji-size);
   display: grid;
   place-items: center;
   border-radius: 9999px;
@@ -663,11 +763,43 @@ const css = `
   color: #e2e8f0;
   box-shadow: 0 6px 20px rgba(0,0,0,0.35);
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+  pointer-events: auto;
+  z-index: 10;
+  line-height: 1;
+  outline-offset: 2px;
 }
-.moon-btn:hover:not([aria-disabled="true"]) {
+.moon-emoji-btn:hover:not([aria-disabled="true"]) {
   transform: translateY(-2px);
   background: rgba(255,255,255,0.09);
   border-color: rgba(167, 139, 250, 0.45);
+}
+
+/* Card de luna — mismo patrón */
+.moon-card {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  transform: translateX(-50%);
+  min-width: 10rem;
+  max-width: 13rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.6rem;
+  background: rgba(15,23,42,0.9);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #e2e8f0;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  transition: opacity 160ms ease, transform 160ms ease;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+.moon-emoji-btn:hover + .moon-card,
+.moon-emoji-btn:focus-visible + .moon-card,
+.moon-card:hover,
+.moon-card:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(-2px);
 }
 
 /* Animaciones */

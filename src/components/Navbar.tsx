@@ -63,12 +63,12 @@ export default function Navbar({
           {/* Branding */}
           <div className="flex items-center gap-2 pr-2">
             <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-500 shadow-[0_0_0_4px_rgba(14,165,233,0.18)]" />
-            <span className="font-extrabold text-slate-900 text-sm sm:text-base">Embiggen Viewer</span>
+            <span className="font-extrabold text-slate-900 text-sm sm:text-base">Quantic View</span>
           </div>
 
           {/* Capa */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Capa</label>
+          <label className="text-xs font-semibold text-slate-600">Layer</label>
           <select
             value={layerId}
             onChange={(e) => onChangeLayer(e.target.value)}
@@ -82,7 +82,7 @@ export default function Navbar({
 
           {/* Fecha */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Fecha</label>
+          <label className="text-xs font-semibold text-slate-600">Date</label>
           <input
             type="date"
             value={date}
@@ -93,23 +93,23 @@ export default function Navbar({
 
           {/* Anotar */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Anotar</label>
+          <label className="text-xs font-semibold text-slate-600">Notes</label>
           <div className="inline-flex rounded-md overflow-hidden border border-slate-300 bg-white">
             <button
               onClick={() => onSetDrawMode("Point")}
               title="Punto (P)"
               className={`px-3 py-1.5 text-sm ${drawMode === "Point" ? "bg-sky-100 border-r border-slate-300" : "border-r border-slate-300 hover:bg-slate-50"}`}
-            >Punto</button>
+            >Point</button>
             <button
               onClick={() => onSetDrawMode("Polygon")}
               title="Polígono (G)"
               className={`px-3 py-1.5 text-sm ${drawMode === "Polygon" ? "bg-sky-100 border-r border-slate-300" : "border-r border-slate-300 hover:bg-slate-50"}`}
-            >Polígono</button>
+            >Polygon</button>
             <button
               onClick={() => onSetDrawMode("None")}
               title="Ninguno (N)"
               className={`px-3 py-1.5 text-sm ${drawMode === "None" ? "bg-sky-100" : "hover:bg-slate-50"}`}
-            >Ninguno</button>
+            >Cursor</button>
           </div>
 
           {/* Editar / Borrar */}
@@ -131,7 +131,7 @@ export default function Navbar({
 
           {/* Opacidad */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Opacidad</label>
+          <label className="text-xs font-semibold text-slate-600">Opacity</label>
           <input
             type="range" min={0} max={1} step={0.05}
             value={opacity}
@@ -141,9 +141,9 @@ export default function Navbar({
 
           {/* Exportar / Importar */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <button onClick={onExport} className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50" title="Exportar GeoJSON">Exportar</button>
+          <button onClick={onExport} className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50" title="Exportar GeoJSON">Export</button>
           <label className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">
-            Importar
+            Import
             <input
               type="file" accept=".geojson,application/geo+json,application/json" className="hidden"
               onChange={(e) => {
@@ -163,7 +163,7 @@ export default function Navbar({
               onClick={onResetView}
               className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50"
               title="Recentrar (R)"
-            >Recentrar</button>
+            >Refocus</button>
             <div className="text-[11px] text-slate-500">
               {cursorCoord ? `Cursor: ${cursorCoord.lon.toFixed(4)}, ${cursorCoord.lat.toFixed(4)}` : "Cursor: —"}
             </div>

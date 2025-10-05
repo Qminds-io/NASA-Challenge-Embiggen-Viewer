@@ -108,14 +108,6 @@ const TREK_LAYERS: TrekLayer[] = [
     format: "png",
     maxLevel: 8,
   },
-  {
-    kind: "trek",
-    body: "Moon",
-    title: "🌙 Moon — WAC Global Mosaic (100m, 2013)",
-    endpoint: "https://trek.nasa.gov/tiles/Moon/EQ/LROC_WAC_Mosaic_Global_100m_June2013",
-    format: "jpg",
-    maxLevel: 10,
-  },
 
   /* ——— Ceres ——— */
   {
@@ -123,14 +115,6 @@ const TREK_LAYERS: TrekLayer[] = [
     body: "Ceres",
     title: "🪐 Ceres — Dawn FC HAMO Color Shaded (60ppd, 2016)",
     endpoint: "https://trek.nasa.gov/tiles/Ceres/EQ/Ceres_Dawn_FC_HAMO_ClrShade_DLR_Global_60ppd_Oct2016",
-    format: "jpg",
-    maxLevel: 10,
-  },
-  {
-    kind: "trek",
-    body: "Ceres",
-    title: "🪐 Ceres — Dawn FC Global Color Mosaic (Oct 2016)",
-    endpoint: "https://trek.nasa.gov/tiles/Ceres/EQ/Ceres_Dawn_FC_Mosaic_Global_60ppd_Oct2016",
     format: "jpg",
     maxLevel: 10,
   },
@@ -713,7 +697,7 @@ export default function App() {
         style={{ top: "calc(var(--navbar-h) + 12px)", height: "calc(100vh - var(--navbar-h) - 24px)" }}
       >
         <div className="flex items-center gap-2 mb-2">
-          <div className="font-extrabold text-slate-900 text-sm">Anotaciones</div>
+          <div className="font-extrabold text-slate-900 text-sm">Notes</div>
           <div className="ml-auto" />
           <input
             placeholder="Filtrar…"
@@ -730,7 +714,7 @@ export default function App() {
         <div className="overflow-auto min-h-0">
           {annotationsList.length === 0 ? (
             <div className="text-sm text-slate-600">
-              No hay anotaciones. Usa <b>Punto</b> o <b>Polígono</b>.
+              There are no annotations. Use <b>Point</b> or <b>Polygon</b>.
             </div>
           ) : (
             <ul className="space-y-2">
@@ -780,7 +764,7 @@ export default function App() {
 
       {/* Pie discreto */}
       <div className="fixed bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 border border-slate-200 rounded-md px-2 py-1 shadow-sm">
-        Escala en la esquina del mapa · Atajos: P/G/N/E/Del/R
+        Scale in the corner of the map · Shortcuts: P/G/N/E/Del/R
       </div>
     </div>
   );
