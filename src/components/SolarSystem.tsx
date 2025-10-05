@@ -1,7 +1,9 @@
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchLayersCatalog, type LayersCatalog } from "../services/api";
 
 /* ========= config logo ========= */
-const LOGO_SRC = "/Logo.png"; // ← pon aquí la ruta real de tu logo (SVG/PNG)
+const LOGO_SRC = "/Logo.png"; // â† pon aquÃ­ la ruta real de tu logo (SVG/PNG)
 
 /* ========= util ========= */
 function todayISO() {
@@ -11,14 +13,14 @@ function todayISO() {
     .slice(0, 10);
 }
 
-/** Devuelve el delay negativo en segundos para sincronizar la animación con el tiempo real */
+/** Devuelve el delay negativo en segundos para sincronizar la animaciÃ³n con el tiempo real */
 function realTimeDelaySeconds(durationSec: number): string {
   const nowSec = Date.now() / 1000;
   const progress = nowSec % durationSec; // [0, durationSec)
-  return `-${progress}s`; // arranca “adelantado” a la posición actual
+  return `-${progress}s`; // arranca â€œadelantadoâ€ a la posiciÃ³n actual
 }
 
-/** Config genérica de cuerpos */
+/** Config genÃ©rica de cuerpos */
 type Proj = "EPSG:3857" | "EPSG:4326";
 type BodyId =
   | "Sun"
@@ -38,16 +40,16 @@ type BodyConfig = {
   id: BodyId;
   name: string;
   emoji: string;
-  /** 1 = primera órbita alrededor del sol (cerca), 2 = siguiente, etc. */
+  /** 1 = primera Ã³rbita alrededor del sol (cerca), 2 = siguiente, etc. */
   ring?: number;
   /** Si es luna, indica el planeta padre (p.ej. "Earth"). */
   isMoonOf?: BodyId;
-  /** Si está habilitado para abrir Map.tsx. */
+  /** Si estÃ¡ habilitado para abrir Map.tsx. */
   enabled: boolean;
-  /** Clave que Map.tsx entiende (y proyección) — solo si enabled. */
+  /** Clave que Map.tsx entiende (y proyecciÃ³n) â€” solo si enabled. */
   key?: string;
   proj?: Proj;
-  /** Texto corto visible bajo el botón/tooltip. */
+  /** Texto corto visible bajo el botÃ³n/tooltip. */
   label?: string;
   /** Tooltip detallado. */
   tooltip: {
@@ -209,6 +211,49 @@ const BODIES: BodyConfig[] = [
 /* ========= Vista principal ========= */
 export default function SolarSystem() {
   const navigate = useNavigate();
+  const [catalog, setCatalog] = useState<LayersCatalog>([]);
+  const [catalogStatus, setCatalogStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogStatus("loading");
+    fetchLayersCatalog()
+      .then((data) => {
+        if (cancelled) return;
+        setCatalog(data);
+        setCatalogStatus("ready");
+        setCatalogError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to load layer catalog", error);
+        setCatalogStatus("error");
+        setCatalogError(error instanceof Error ? error.message : "No se pudo cargar el catalogo");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+
+  const catalogBodies = useMemo(() => {
+    const map = new Map(catalog.map((entry) => [entry.bodyId, entry]));
+    return BODIES.map((body) => {
+      const entry = map.get(body.id);
+      if (!entry || entry.layers.length === 0) {
+        return { ...body, enabled: false, key: undefined, proj: undefined, label: body.label };
+      }
+      const defaultLayer = entry.layers[0];
+      return {
+        ...body,
+        enabled: true,
+        key: defaultLayer.layerKey,
+        proj: defaultLayer.projection as Proj,
+        label: defaultLayer.title,
+      };
+    });
+  }, [catalog]);
 
   const openBody = (b: BodyConfig) => {
     if (!b.enabled || !b.key || !b.proj) return;
@@ -216,15 +261,16 @@ export default function SolarSystem() {
     navigate({ pathname: "/map", hash });
   };
 
-  const enabledBodies = BODIES.filter((b) => b.enabled && !b.isMoonOf);
-  const enabledMoons = BODIES.filter((b) => b.enabled && b.isMoonOf);
+  const bodiesList = catalogStatus === "ready" ? catalogBodies : BODIES;
+  const enabledBodies = bodiesList.filter((b) => b.enabled && !b.isMoonOf);
+  const enabledMoons = bodiesList.filter((b) => b.enabled && b.isMoonOf);
 
   return (
     <div className="min-h-screen relative bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100 overflow-hidden">
       {/* Encabezado */}
       <div className="max-w-6xl mx-auto px-4 pt-6">
         <div className="flex items-center gap-3">
-          {/* === Logo a la izquierda del título === */}
+          {/* === Logo a la izquierda del tÃ­tulo === */}
           <img
             src={LOGO_SRC}
             alt="Quantic View logo"
@@ -233,20 +279,27 @@ export default function SolarSystem() {
             decoding="async"
           />
           <h1 className="text-xl font-extrabold tracking-tight">
-            Quantic View — Solar System
+            Quantic View â€” Solar System
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-300">
           Tap a body to open the viewer with its default layer. In the viewer, you can change layers for the same body.
         </p>
+        {catalogStatus === "error" && catalogError && (
+          <div className="mt-3 text-xs text-rose-400">{catalogError}</div>
+        )}
+        {catalogStatus === "loading" && (
+          <div className="mt-3 text-xs text-slate-300">Cargando catalogo...</div>
+        )}
+
       </div>
 
       {/* Diagrama orbital (md+) */}
       <div className="hidden md:block">
-        <SolarDiagram bodies={BODIES} onOpen={openBody} />
+        <SolarDiagram bodies={bodiesList} onOpen={openBody} />
       </div>
 
-      {/* Fallback móvil: tarjetas solo de habilitados */}
+      {/* Fallback mÃ³vil: tarjetas solo de habilitados */}
       <div className="block md:hidden max-w-6xl mx-auto px-4 pb-14">
         <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 mt-6">
           {enabledBodies.map((b) => (
@@ -278,7 +331,7 @@ export default function SolarSystem() {
         </div>
 
         <div className="mt-10 text-xs text-slate-400">
-          Fuentes: NASA EOSDIS GIBS · NASA Solar System Treks.
+          Fuentes: NASA EOSDIS GIBS Â· NASA Solar System Treks.
         </div>
       </div>
 
@@ -288,7 +341,7 @@ export default function SolarSystem() {
   );
 }
 
-/* =============== Diagrama con órbitas animadas y dinámicas =============== */
+/* =============== Diagrama con Ã³rbitas animadas y dinÃ¡micas =============== */
 
 function SolarDiagram({
   bodies,
@@ -314,7 +367,7 @@ function SolarDiagram({
         <div className="sun-core" />
       </div>
 
-      {/* Órbitas */}
+      {/* Ã“rbitas */}
       {rings.map((ring) => {
         const radius = ringRadius(ring);
         const durSec = durationSeconds(ring);
@@ -360,7 +413,7 @@ function SolarDiagram({
                         disabled={!p.enabled}
                       />
 
-                      {/* Sub-órbita Luna */}
+                      {/* Sub-Ã³rbita Luna */}
                       {p.id === "Earth" &&
                         earthMoons.map((m) => {
                           const moonDurSec = 18;
@@ -386,7 +439,7 @@ function SolarDiagram({
 
       {/* Leyenda */}
       <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-xs text-slate-400">
-        Fuentes: NASA EOSDIS GIBS · NASA Solar System Treks
+        Fuentes: NASA EOSDIS GIBS Â· NASA Solar System Treks
       </div>
     </div>
   );
@@ -490,7 +543,7 @@ function PlanetButton({
         tabIndex={-1}
       >
         <div className="font-semibold text-sm">{label}</div>
-        <div className="text-[11px] opacity-80">{caption || "Próximamente"}</div>
+        <div className="text-[11px] opacity-80">{caption || "PrÃ³ximamente"}</div>
       </button>
     </div>
   );
@@ -532,13 +585,13 @@ function MiniMoonButton({
         tabIndex={-1}
       >
         <div className="text-[13px] font-semibold text-slate-100">{title}</div>
-        <div className="text-[11px] opacity-80">{caption || "Próximamente"}</div>
+        <div className="text-[11px] opacity-80">{caption || "PrÃ³ximamente"}</div>
       </button>
     </div>
   );
 }
 
-/* =============== Fallback cards (móvil) =============== */
+/* =============== Fallback cards (mÃ³vil) =============== */
 
 function PlanetCard({
   name,
@@ -576,7 +629,7 @@ function PlanetCard({
 
 /* =============== Helpers visuales =============== */
 
-/** Tamaño de órbita en función del índice (vmin) */
+/** TamaÃ±o de Ã³rbita en funciÃ³n del Ã­ndice (vmin) */
 function ringRadius(ring: number | undefined): string {
   const base = 30; // vmin
   const step = 12; // vmin
@@ -584,18 +637,18 @@ function ringRadius(ring: number | undefined): string {
   return `${r}vmin`;
 }
 
-/** Duración (más lejana = más lenta) en segundos como número */
+/** DuraciÃ³n (mÃ¡s lejana = mÃ¡s lenta) en segundos como nÃºmero */
 function durationSeconds(ring: number | undefined): number {
   const base = 120; // s
   const step = 60; // s
   return base + step * (Number(ring ?? 1) - 1);
 }
 
-/* =============== CSS específico del diagrama =============== */
+/* =============== CSS especÃ­fico del diagrama =============== */
 
 const css = `
 :root{
-  --planet-emoji-size: 2.8rem; /* ajustar si quieres aún más/menos solape */
+  --planet-emoji-size: 2.8rem; /* ajustar si quieres aÃºn mÃ¡s/menos solape */
   --moon-emoji-size:   2.4rem;
 }
 
@@ -624,10 +677,10 @@ const css = `
   z-index: 1;
 }
 
-/* ✅ Desactivar captura de eventos del Sol y su halo */
+/* âœ… Desactivar captura de eventos del Sol y su halo */
 .solar-center, .sun-core, .sun-glow { pointer-events: none; }
 
-/* Órbitas (anillos) */
+/* Ã“rbitas (anillos) */
 .orbit {
   position: absolute;
   top: 50%;
@@ -647,7 +700,7 @@ const css = `
 }
 .counter { transform-origin: center; }
 
-/* Punto de anclaje en el borde derecho de la órbita */
+/* Punto de anclaje en el borde derecho de la Ã³rbita */
 .anchor {
   position: absolute;
   top: 50%;
@@ -655,7 +708,7 @@ const css = `
   transform: translate(-50%, -50%);
 }
 
-/* Sub-órbita (Luna) — permitir clics en su interior sin tapar la Tierra */
+/* Sub-Ã³rbita (Luna) â€” permitir clics en su interior sin tapar la Tierra */
 .suborbit {
   position: absolute;
   top: 0; left: 0;
@@ -668,18 +721,18 @@ const css = `
 .subrotator { position: absolute; inset: 0; transform-origin: 50% 50%; animation: spin 18s linear infinite; }
 .subanchor { position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%); }
 
-/* ====== Emoji + Card en hover (más preciso) ====== */
+/* ====== Emoji + Card en hover (mÃ¡s preciso) ====== */
 .planet-wrap{
   position: relative;
-  isolation: isolate; /* aísla z-index local */
-  z-index: 10;        /* <= default por encima de sub-órbita */
+  isolation: isolate; /* aÃ­sla z-index local */
+  z-index: 10;        /* <= default por encima de sub-Ã³rbita */
 }
 .planet-wrap:hover,
 .planet-wrap:focus-within{
-  z-index: 99; /* eleva sobre vecinos para click fácil */
+  z-index: 99; /* eleva sobre vecinos para click fÃ¡cil */
 }
 
-/* Botón emoji planeta — hitbox reducido */
+/* BotÃ³n emoji planeta â€” hitbox reducido */
 .planet-emoji-btn {
   position: relative; /* necesario para el ::after del hitbox */
   width: var(--planet-emoji-size);
@@ -710,10 +763,10 @@ const css = `
   inset: -8px;           /* expande ~8px todo alrededor */
   border-radius: 9999px;
   /* sin fondo ni borde: invisible */
-  pointer-events: auto;  /* capta el click y lo delega al botón */
+  pointer-events: auto;  /* capta el click y lo delega al botÃ³n */
 }
 
-/* Card de planeta — SOLO aparece con hover/focus en el emoji o en la card */
+/* Card de planeta â€” SOLO aparece con hover/focus en el emoji o en la card */
 .planet-card {
   position: absolute;
   left: 50%;
@@ -751,7 +804,7 @@ const css = `
 .ring-amber   { box-shadow: 0 0 0 4px rgba(245,158,11,0.16) inset; }
 .ring-indigo  { box-shadow: 0 0 0 4px rgba(99,102,241,0.16) inset; }
 
-/* Emoji Luna — hitbox reducido (se mantiene) */
+/* Emoji Luna â€” hitbox reducido (se mantiene) */
 .moon-emoji-btn {
   width: var(--moon-emoji-size);
   height: var(--moon-emoji-size);
@@ -774,7 +827,7 @@ const css = `
   border-color: rgba(167, 139, 250, 0.45);
 }
 
-/* Card de luna — mismo patrón */
+/* Card de luna â€” mismo patrÃ³n */
 .moon-card {
   position: absolute;
   left: 50%;
