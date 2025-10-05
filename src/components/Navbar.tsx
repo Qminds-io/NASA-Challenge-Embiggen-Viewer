@@ -73,7 +73,7 @@ export default function Navbar({
             value={layerId}
             onChange={(e) => onChangeLayer(e.target.value)}
             className="px-2.5 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
-            title="Capa base GIBS"
+            title="Capa base"
           >
             {layers.map((l) => (
               <option key={l.id} value={l.id}>{l.title}</option>
