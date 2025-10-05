@@ -291,7 +291,6 @@ function SolarDiagram({
     new Set(planets.map((p) => p.ring ?? 0))
   ).sort((a, b) => a - b);
 
-  const earth = planets.find((p) => p.id === "Earth");
   const earthMoons = bodies.filter((b) => b.isMoonOf === "Earth");
 
   return (
