@@ -1,4 +1,5 @@
 import type { MutableRefObject } from "react";
+import { Link } from "react-router-dom";
 
 type LayerOption = { id: string; title: string };
 type Coord = { lon: number; lat: number } | null;
@@ -18,15 +19,15 @@ type Props = {
   drawMode: DrawMode;
   onSetDrawMode: (m: DrawMode) => void;
 
-  isModifyOn: boolean;
-  onToggleModify: () => void;
+  isModifyOn: boolean;          // ← se mantiene para compatibilidad, ya no se usa
+  onToggleModify: () => void;   // ← se mantiene para compatibilidad, ya no se usa
   onDeleteSelected: () => void;
 
   opacity: number;
   onOpacityChange: (v: number) => void;
 
   onExport: () => void;
-  onImport: (file: File) => void;
+  onImport: (file: File) => void; // ← se mantiene para compatibilidad, ya no se usa
 
   onResetView: () => void;
   cursorCoord: Coord;
@@ -42,13 +43,13 @@ export default function Navbar({
   onChangeDate,
   drawMode,
   onSetDrawMode,
-  isModifyOn,
-  onToggleModify,
+  // isModifyOn,              // ← no usado
+  // onToggleModify,          // ← no usado
   onDeleteSelected,
   opacity,
   onOpacityChange,
   onExport,
-  onImport,
+  // onImport,                // ← no usado
   onResetView,
   cursorCoord,
 }: Props) {
@@ -60,11 +61,13 @@ export default function Navbar({
       <div className="max-w-7xl mx-auto px-4">
         {/* MULTI-FILA con wrap: sin scroll horizontal */}
         <div className="py-2 flex flex-wrap items-center gap-x-2 gap-y-2">
-          {/* Branding */}
-          <div className="flex items-center gap-2 pr-2">
+          {/* Branding (clic para ir a la Home) */}
+          <Link to="/" className="flex items-center gap-2 pr-2 group" title="Ir a la página principal">
             <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-500 shadow-[0_0_0_4px_rgba(14,165,233,0.18)]" />
-            <span className="font-extrabold text-slate-900 text-sm sm:text-base">Quantic View</span>
-          </div>
+            <span className="font-extrabold text-slate-900 text-sm sm:text-base group-hover:underline">
+              Quantic View
+            </span>
+          </Link>
 
           {/* Capa */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
@@ -112,15 +115,8 @@ export default function Navbar({
             >Cursor</button>
           </div>
 
-          {/* Editar / Borrar */}
+          {/* SOLO Borrar (se quitó Editar) */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <button
-            onClick={onToggleModify}
-            title="Editar (E)"
-            className={`px-3 py-1.5 text-sm rounded-md border ${isModifyOn ? "border-sky-400 bg-sky-100" : "border-slate-300 bg-white hover:bg-slate-50"}`}
-          >
-            {isModifyOn ? "Editar: ON" : "Editar: OFF"}
-          </button>
           <button
             onClick={onDeleteSelected}
             title="Borrar selección (Del)"
@@ -139,20 +135,15 @@ export default function Navbar({
             className="w-28" title="Opacidad de la capa"
           />
 
-          {/* Exportar / Importar */}
+          {/* Exportar (se quitó Import) */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <button onClick={onExport} className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50" title="Exportar GeoJSON">Export</button>
-          <label className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">
-            Import
-            <input
-              type="file" accept=".geojson,application/geo+json,application/json" className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onImport(file);
-                (e.currentTarget as HTMLInputElement).value = "";
-              }}
-            />
-          </label>
+          <button
+            onClick={onExport}
+            className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50"
+            title="Exportar GeoJSON"
+          >
+            Export
+          </button>
 
           {/* Spacer */}
           <div className="grow" />
