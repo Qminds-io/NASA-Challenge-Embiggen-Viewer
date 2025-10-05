@@ -5,35 +5,6 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>embiggen-viewer</title>
-
-    <!-- (Opcional) Mejora de performance para el dominio de Aladin -->
-    <link rel="preconnect" href="https://aladin.cds.unistra.fr" crossorigin />
-    <link rel="dns-prefetch" href="https://aladin.cds.unistra.fr" />
-
-    <!-- CSS del CDN oficial de Aladin Lite v3 -->
-    <link
-      rel="stylesheet"
-      href="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.min.css"
-      referrerpolicy="no-referrer"
-    />
-
-    <!-- JS del CDN oficial de Aladin Lite v3 -->
-    <!-- IMPORTANTE: este <script> va ANTES de tu main.tsx para que window.A esté disponible -->
-    <script
-      src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.min.js"
-      defer
-      referrerpolicy="no-referrer"
-    ></script>
-
-    <!--
-      (Opcional) CSP muy básica. OJO: en desarrollo puede interferir con Vite HMR/WebSocket.
-      Si la activas y ves problemas con HMR, quítala o ajusta para permitir el ws://localhost:5173.
-      <meta http-equiv="Content-Security-Policy"
-            content="default-src 'self';
-                     img-src 'self' data: https:;
-                     style-src 'self' 'unsafe-inline' https://aladin.cds.unistra.fr;
-                     script-src 'self' https://aladin.cds.unistra.fr;">
-    -->
   </head>
   <body>
     <div id="root"></div>
