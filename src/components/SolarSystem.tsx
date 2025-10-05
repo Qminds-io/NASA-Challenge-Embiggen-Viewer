@@ -260,8 +260,8 @@ export default function SolarSystem() {
                 b.theme === "earth"
                   ? "from-emerald-400/20 to-cyan-400/10"
                   : b.theme === "mars"
-                  ? "from-rose-400/20 to-amber-400/10"
-                  : "from-sky-400/20 to-violet-400/10"
+                    ? "from-rose-400/20 to-amber-400/10"
+                    : "from-sky-400/20 to-violet-400/10"
               }
             />
           ))}
@@ -281,6 +281,49 @@ export default function SolarSystem() {
           Fuentes: NASA EOSDIS GIBS · NASA Solar System Treks.
         </div>
       </div>
+
+      {/* Repositorios (inferior izquierda) */}
+      <div
+        className="fixed left-3 bottom-3 z-40 max-w-[88vw] md:max-w-xs"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        aria-label="Repositorios del proyecto"
+      >
+        <div className="rounded-xl border border-white/10 bg-white/10 backdrop-blur px-3 py-2 shadow-lg">
+          <div className="text-[11px] uppercase tracking-wide text-slate-300 mb-1">
+            Repositorios
+          </div>
+          <ul className="text-sm text-slate-100 space-y-1">
+            <li>
+              <a
+                href="https://github.com/Qminds-io/NASA-Challenge-Embiggen-Viewer"
+                target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 hover:text-sky-300 hover:underline underline-offset-2"
+                title="Abrir repo del Viewer"
+              >
+                {/* GitHub icon */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="opacity-90">
+                  <path fillRule="evenodd" d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.41-1.35-1.78-1.35-1.78-1.1-.75.09-.73.09-.73 1.22.09 1.86 1.26 1.86 1.26 1.08 1.86 2.82 1.32 3.5 1.01.11-.79.42-1.32.76-1.62-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.16 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.67 1.64.25 2.86.13 3.16.77.84 1.23 1.91 1.23 3.22 0 4.6-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0 0 0 12 .5Z" />
+                </svg>
+                <span className="truncate">Embiggen Viewer</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://github.com/Qminds-io/NASA-challenge-embiggen-api"
+                target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 hover:text-sky-300 hover:underline underline-offset-2"
+                title="Abrir repo de la API"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="opacity-90">
+                  <path fillRule="evenodd" d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.41-1.35-1.78-1.35-1.78-1.1-.75.09-.73.09-.73 1.22.09 1.86 1.26 1.86 1.26 1.08 1.86 2.82 1.32 3.5 1.01.11-.79.42-1.32.76-1.62-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.16 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.67 1.64.25 2.86.13 3.16.77.84 1.23 1.91 1.23 3.22 0 4.6-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0 0 0 12 .5Z" />
+                </svg>
+                <span className="truncate">Embiggen API</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
 
       {/* CSS embebido */}
       <style>{css}</style>
@@ -457,14 +500,14 @@ function PlanetButton({
     theme === "earth"
       ? "ring-emerald"
       : theme === "mars"
-      ? "ring-rose"
-      : theme === "ceres"
-      ? "ring-cyan"
-      : theme === "venus"
-      ? "ring-fuchsia"
-      : theme === "mercury"
-      ? "ring-amber"
-      : "ring-indigo";
+        ? "ring-rose"
+        : theme === "ceres"
+          ? "ring-cyan"
+          : theme === "venus"
+            ? "ring-fuchsia"
+            : theme === "mercury"
+              ? "ring-amber"
+              : "ring-indigo";
 
   return (
     <div className="planet-wrap group inline-flex items-center justify-center">
@@ -566,7 +609,7 @@ function PlanetCard({
         >
           Abrir mapa
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-80">
-            <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       </div>
