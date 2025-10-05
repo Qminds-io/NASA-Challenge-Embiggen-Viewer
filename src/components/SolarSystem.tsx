@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 
 /* ========= util ========= */
@@ -591,6 +590,7 @@ const css = `
   border: 1px dashed rgba(148, 163, 184, 0.35);
   border-radius: 9999px;
   transform: translate(-50%, -50%);
+  pointer-events: none; /* no bloquear clics sobre planetas */
 }
 
 /* Rotadores (giran alrededor del centro) */
@@ -619,12 +619,14 @@ const css = `
   transform: translate(-50%, -50%);
   border: 1px dashed rgba(148,163,184,0.3);
   border-radius: 9999px;
+  pointer-events: none; /* no bloquear clics sobre la luna */
 }
 .subrotator { position: absolute; inset: 0; transform-origin: 50% 50%; animation: spin 18s linear infinite; }
 .subanchor { position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%); }
 
 /* Botones planeta */
 .planet-btn {
+  pointer-events: auto; /* asegurar que el botón sí reciba el clic */
   min-width: 10.5rem;
   max-width: 15rem;
   padding: 0.6rem 0.8rem;
@@ -651,6 +653,7 @@ const css = `
 
 /* Botón Luna (compacto) */
 .moon-btn {
+  pointer-events: auto; /* asegurar que el botón sí reciba el clic */
   width: 3.3rem;
   height: 3.3rem;
   display: grid;
