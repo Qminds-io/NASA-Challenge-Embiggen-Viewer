@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 /* ========= config logo ========= */
-const LOGO_SRC = "/Logo.png"; // ← pon aquí la ruta real de tu logo (SVG/PNG)
+const LOGO_SRC = "/Logo.png"; // ruta del logo (SVG/PNG)
 
 /* ========= util ========= */
 function todayISO() {
@@ -11,11 +11,11 @@ function todayISO() {
     .slice(0, 10);
 }
 
-/** Devuelve el delay negativo en segundos para sincronizar la animación con el tiempo real */
+/** Sincroniza animación con tiempo real (fase) */
 function realTimeDelaySeconds(durationSec: number): string {
   const nowSec = Date.now() / 1000;
-  const progress = nowSec % durationSec; // [0, durationSec)
-  return `-${progress}s`; // arranca “adelantado” a la posición actual
+  const progress = nowSec % durationSec;
+  return `-${progress}s`;
 }
 
 /** Config genérica de cuerpos */
@@ -37,34 +37,27 @@ type BodyId =
 type BodyConfig = {
   id: BodyId;
   name: string;
-  emoji: string;
-  /** 1 = primera órbita alrededor del sol (cerca), 2 = siguiente, etc. */
-  ring?: number;
-  /** Si es luna, indica el planeta padre (p.ej. "Earth"). */
-  isMoonOf?: BodyId;
-  /** Si está habilitado para abrir Map.tsx. */
+  emoji: string;       // fallback si no hay icono
+  iconSrc?: string;    // ruta a SVG en /public/icons
+  ring?: number;       // órbita (1 = más interna)
+  isMoonOf?: BodyId;   // si es luna, planeta padre
   enabled: boolean;
-  /** Clave que Map.tsx entiende (y proyección) — solo si enabled. */
-  key?: string;
+  key?: string;        // clave del viewer (Map.tsx)
   proj?: Proj;
-  /** Texto corto visible bajo el botón/tooltip. */
-  label?: string;
-  /** Tooltip detallado. */
-  tooltip: {
-    title: string;
-    lines: string[];
-  };
-  /** Tema visual para el botón. */
+  label?: string;      // caption visible
+  tooltip: { title: string; lines: string[] };
   theme?: "earth" | "mars" | "ceres" | "venus" | "mercury" | "gas";
 };
 
-/** Solo cuerpos habilitados apuntan a capas que sabemos funcionan con tu Map.tsx actual */
+/** === Catálogo ===
+ * Asegúrate de tener los SVG en /public/icons/<nombre>.svg
+ */
 const BODIES: BodyConfig[] = [
-  // ——— Planetas habilitados ———
   {
     id: "Earth",
     name: "Tierra",
     emoji: "🌍",
+    iconSrc: "/icons/tierra.png",
     ring: 2,
     enabled: true,
     key: "gibs:MODIS_Terra_CorrectedReflectance_TrueColor",
@@ -84,6 +77,7 @@ const BODIES: BodyConfig[] = [
     id: "Mars",
     name: "Marte",
     emoji: "🪐",
+    iconSrc: "/icons/marte.png",
     ring: 3,
     enabled: true,
     key: "trek:Mars:https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m",
@@ -103,6 +97,7 @@ const BODIES: BodyConfig[] = [
     id: "Ceres",
     name: "Ceres",
     emoji: "🛰️",
+    iconSrc: "/icons/neptuno.png",
     ring: 4,
     enabled: true,
     key: "trek:Ceres:https://trek.nasa.gov/tiles/Ceres/EQ/Ceres_Dawn_FC_HAMO_ClrShade_DLR_Global_60ppd_Oct2016",
@@ -119,11 +114,12 @@ const BODIES: BodyConfig[] = [
     theme: "ceres",
   },
 
-  // ——— Lunas habilitadas ———
+  // Lunas habilitadas
   {
     id: "Moon",
     name: "Luna",
     emoji: "🌙",
+    iconSrc: "/icons/moon.svg",
     isMoonOf: "Earth",
     enabled: true,
     key: "trek:Moon:https://trek.nasa.gov/tiles/Moon/EQ/LRO_LOLA_ClrShade_Global_128ppd_v04",
@@ -140,11 +136,12 @@ const BODIES: BodyConfig[] = [
     theme: "earth",
   },
 
-  // ——— Planetas/moons “próximamente” ———
+  // Próximos (deshabilitados por ahora, pero con iconos listos)
   {
     id: "Mercury",
     name: "Mercurio",
     emoji: "☿️",
+    iconSrc: "/icons/mercurio.png",
     ring: 1,
     enabled: false,
     tooltip: { title: "Mercurio", lines: ["Próximamente."] },
@@ -154,6 +151,7 @@ const BODIES: BodyConfig[] = [
     id: "Venus",
     name: "Venus",
     emoji: "♀️",
+    iconSrc: "/icons/venus.png",
     ring: 1.6 as any,
     enabled: false,
     tooltip: { title: "Venus", lines: ["Próximamente."] },
@@ -163,6 +161,7 @@ const BODIES: BodyConfig[] = [
     id: "Vesta",
     name: "Vesta",
     emoji: "🪨",
+    iconSrc: "/icons/urano.png",
     ring: 4.6 as any,
     enabled: false,
     tooltip: { title: "Vesta", lines: ["Próximamente."] },
@@ -172,6 +171,7 @@ const BODIES: BodyConfig[] = [
     id: "Jupiter",
     name: "Júpiter",
     emoji: "♃",
+    iconSrc: "/icons/jupiter.png",
     ring: 6,
     enabled: false,
     tooltip: { title: "Júpiter", lines: ["Próximamente."] },
@@ -181,6 +181,7 @@ const BODIES: BodyConfig[] = [
     id: "Saturn",
     name: "Saturno",
     emoji: "♄",
+    iconSrc: "/icons/saturno.png",
     ring: 7,
     enabled: false,
     tooltip: { title: "Saturno", lines: ["Próximamente."] },
@@ -190,6 +191,7 @@ const BODIES: BodyConfig[] = [
     id: "Europa",
     name: "Europa",
     emoji: "🧊",
+    iconSrc: "/icons/europa.svg",
     isMoonOf: "Jupiter",
     enabled: false,
     tooltip: { title: "Europa (Luna de Júpiter)", lines: ["Próximamente."] },
@@ -199,6 +201,7 @@ const BODIES: BodyConfig[] = [
     id: "Titan",
     name: "Titán",
     emoji: "🟤",
+    iconSrc: "/icons/titan.svg",
     isMoonOf: "Saturn",
     enabled: false,
     tooltip: { title: "Titán (Luna de Saturno)", lines: ["Próximamente."] },
@@ -224,7 +227,6 @@ export default function SolarSystem() {
       {/* Encabezado */}
       <div className="max-w-6xl mx-auto px-4 pt-6">
         <div className="flex items-center gap-3">
-          {/* === Logo a la izquierda del título === */}
           <img
             src={LOGO_SRC}
             alt="Quantic View logo"
@@ -254,14 +256,15 @@ export default function SolarSystem() {
               key={b.id}
               name={b.name}
               emoji={b.emoji}
+              iconSrc={b.iconSrc}
               caption={b.label ?? ""}
               onOpen={() => openBody(b)}
               accent={
                 b.theme === "earth"
                   ? "from-emerald-400/20 to-cyan-400/10"
                   : b.theme === "mars"
-                    ? "from-rose-400/20 to-amber-400/10"
-                    : "from-sky-400/20 to-violet-400/10"
+                  ? "from-rose-400/20 to-amber-400/10"
+                  : "from-sky-400/20 to-violet-400/10"
               }
             />
           ))}
@@ -270,6 +273,7 @@ export default function SolarSystem() {
               key={m.id}
               name={m.name}
               emoji={m.emoji}
+              iconSrc={m.iconSrc}
               caption={m.label ?? ""}
               onOpen={() => openBody(m)}
               accent="from-indigo-400/20 to-fuchsia-400/10"
@@ -300,7 +304,6 @@ export default function SolarSystem() {
                 className="inline-flex items-center gap-2 hover:text-sky-300 hover:underline underline-offset-2"
                 title="Abrir repo del Viewer"
               >
-                {/* GitHub icon */}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="opacity-90">
                   <path fillRule="evenodd" d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.41-1.35-1.78-1.35-1.78-1.1-.75.09-.73.09-.73 1.22.09 1.86 1.26 1.86 1.26 1.08 1.86 2.82 1.32 3.5 1.01.11-.79.42-1.32.76-1.62-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.16 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.67 1.64.25 2.86.13 3.16.77.84 1.23 1.91 1.23 3.22 0 4.6-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0 0 0 12 .5Z" />
                 </svg>
@@ -315,7 +318,7 @@ export default function SolarSystem() {
                 title="Abrir repo de la API"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="opacity-90">
-                  <path fillRule="evenodd" d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.41-1.35-1.78-1.35-1.78-1.1-.75.09-.73.09-.73 1.22.09 1.86 1.26 1.86 1.26 1.08 1.86 2.82 1.32 3.5 1.01.11-.79.42-1.32.76-1.62-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.16 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.67 1.64.25 2.86.13 3.16.77.84 1.23 1.91 1.23 3.22 0 4.6-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0 0 0 12 .5Z" />
+                  <path fillRule="evenodd" d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.41-1.35-1.78-1.35-1.78-1.1-.75.09-.73.09-.73 1.22.09 1.86 1.26 1.86 1.26 1.08 1.86 2.82 1.32 3.5 1.01.11-.79.42-1.32.76-1.62-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.16 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.67 1.64.25 2.86.13 3.16.77.84 1.23 1.91 1.23 3.22 0 4.6-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0  0 0 12 .5Z" />
                 </svg>
                 <span className="truncate">Embiggen API</span>
               </a>
@@ -323,7 +326,6 @@ export default function SolarSystem() {
           </ul>
         </div>
       </div>
-
 
       {/* CSS embebido */}
       <style>{css}</style>
@@ -351,7 +353,7 @@ function SolarDiagram({
       className="relative mx-auto mt-8 mb-16"
       style={{ width: "min(92vmin, 900px)", height: "min(92vmin, 900px)" }}
     >
-      {/* Sol */}
+      {/* Sol (decorativo) */}
       <div className="solar-center">
         <div className="sun-glow" />
         <div className="sun-core" />
@@ -398,12 +400,13 @@ function SolarDiagram({
                         label={p.name}
                         caption={p.label ?? ""}
                         emoji={p.emoji}
+                        iconSrc={p.iconSrc}
                         onClick={() => onOpen(p)}
                         theme={p.theme ?? "earth"}
                         disabled={!p.enabled}
                       />
 
-                      {/* Sub-órbita Luna */}
+                      {/* Sub-órbita Luna (centrada respecto a Tierra) */}
                       {p.id === "Earth" &&
                         earthMoons.map((m) => {
                           const moonDurSec = 18;
@@ -477,21 +480,23 @@ function SubOrbitMoon({
   );
 }
 
-/* =============== Botones con "emoji + card on hover" =============== */
+/* =============== Botones con icono/emoji + card on hover =============== */
 
 function PlanetButton({
   id,
   label,
   caption,
   emoji,
+  iconSrc,
   onClick,
   theme,
   disabled = false,
 }: {
-  id?: BodyId; // <-- para poder detectar Earth en CSS
+  id?: BodyId;
   label: string;
   caption: string;
   emoji: string;
+  iconSrc?: string;
   onClick: () => void;
   theme: "earth" | "mars" | "ceres" | "venus" | "mercury" | "gas";
   disabled?: boolean;
@@ -500,31 +505,41 @@ function PlanetButton({
     theme === "earth"
       ? "ring-emerald"
       : theme === "mars"
-        ? "ring-rose"
-        : theme === "ceres"
-          ? "ring-cyan"
-          : theme === "venus"
-            ? "ring-fuchsia"
-            : theme === "mercury"
-              ? "ring-amber"
-              : "ring-indigo";
+      ? "ring-rose"
+      : theme === "ceres"
+      ? "ring-cyan"
+      : theme === "venus"
+      ? "ring-fuchsia"
+      : theme === "mercury"
+      ? "ring-amber"
+      : "ring-indigo";
 
   return (
     <div className="planet-wrap group inline-flex items-center justify-center">
-      {/* Emoji visible */}
+      {/* Icono visible (SVG o emoji fallback) */}
       <button
-        data-id={id}       // <= identificamos la Tierra
+        data-id={id}
         onClick={onClick}
         disabled={disabled}
         className={`planet-emoji-btn ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         title={label}
         aria-disabled={disabled}
       >
-        <span className="text-2xl leading-none">{emoji}</span>
+        {iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="planet-icon"
+            loading="eager"
+            decoding="async"
+          />
+        ) : (
+          <span className="text-2xl leading-none">{emoji}</span>
+        )}
         <span className="sr-only">{label}</span>
       </button>
 
-      {/* Card (aparece al hover del emoji o de la card) */}
+      {/* Card (aparece al hover/focus) */}
       <button
         onClick={onClick}
         disabled={disabled}
@@ -554,7 +569,6 @@ function MiniMoonButton({
 }) {
   return (
     <div className="planet-wrap group inline-flex items-center justify-center">
-      {/* Emoji luna visible */}
       <button
         onClick={onClick}
         disabled={disabled}
@@ -566,7 +580,6 @@ function MiniMoonButton({
         <span className="sr-only">{title}</span>
       </button>
 
-      {/* Card de luna */}
       <button
         onClick={onClick}
         disabled={disabled}
@@ -586,12 +599,14 @@ function MiniMoonButton({
 function PlanetCard({
   name,
   emoji,
+  iconSrc,
   caption,
   onOpen,
   accent,
 }: {
   name: string;
   emoji: string;
+  iconSrc?: string;
   caption: string;
   onOpen: () => void;
   accent: string;
@@ -600,7 +615,13 @@ function PlanetCard({
     <div className={`rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl relative overflow-hidden`}>
       <div className={`pointer-events-none absolute -inset-6 bg-gradient-to-br ${accent} blur-3xl opacity-40`} />
       <div className="relative">
-        <div className="text-4xl mb-3">{emoji}</div>
+        <div className="mb-3">
+          {iconSrc ? (
+            <img src={iconSrc} alt="" className="w-8 h-8 md:w-9 md:h-9" />
+          ) : (
+            <span className="text-4xl">{emoji}</span>
+          )}
+        </div>
         <div className="font-semibold text-lg">{name}</div>
         <div className="text-sm text-slate-300 mt-1">{caption}</div>
         <button
@@ -609,7 +630,7 @@ function PlanetCard({
         >
           Abrir mapa
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-80">
-            <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
       </div>
@@ -619,7 +640,6 @@ function PlanetCard({
 
 /* =============== Helpers visuales =============== */
 
-/** Tamaño de órbita en función del índice (vmin) */
 function ringRadius(ring: number | undefined): string {
   const base = 30; // vmin
   const step = 12; // vmin
@@ -627,7 +647,6 @@ function ringRadius(ring: number | undefined): string {
   return `${r}vmin`;
 }
 
-/** Duración (más lejana = más lenta) en segundos como número */
 function durationSeconds(ring: number | undefined): number {
   const base = 120; // s
   const step = 60; // s
@@ -638,11 +657,11 @@ function durationSeconds(ring: number | undefined): number {
 
 const css = `
 :root{
-  --planet-emoji-size: 2.8rem; /* ajustar si quieres aún más/menos solape */
-  --moon-emoji-size:   2.4rem;
+  --planet-emoji-size: 2.8rem; /* diámetro del botón del planeta */
+  --moon-emoji-size:   2.4rem; /* diámetro del botón de la luna */
 }
 
-/* Centro del sistema */
+/* Centro del sistema (decorativo) */
 .solar-center {
   position: absolute;
   inset: 50% auto auto 50%;
@@ -667,7 +686,7 @@ const css = `
   z-index: 1;
 }
 
-/* ✅ Desactivar captura de eventos del Sol y su halo */
+/* No capturar eventos del sol */
 .solar-center, .sun-core, .sun-glow { pointer-events: none; }
 
 /* Órbitas (anillos) */
@@ -678,53 +697,36 @@ const css = `
   border: 1px dashed rgba(148, 163, 184, 0.35);
   border-radius: 9999px;
   transform: translate(-50%, -50%);
-  pointer-events: none; /* no bloquear clics de planetas */
+  pointer-events: none;
 }
 
 /* Rotadores */
-.rotator {
-  position: absolute;
-  inset: 0;
-  transform-origin: 50% 50%;
-  animation: spin 120s linear infinite;
-}
+.rotator { position: absolute; inset: 0; transform-origin: 50% 50%; animation: spin 120s linear infinite; }
 .counter { transform-origin: center; }
 
-/* Punto de anclaje en el borde derecho de la órbita */
-.anchor {
-  position: absolute;
-  top: 50%;
-  left: 100%;
-  transform: translate(-50%, -50%);
-}
+/* Ancla: planeta en el borde derecho de cada órbita */
+.anchor { position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%); }
 
-/* Sub-órbita (Luna) — permitir clics en su interior sin tapar la Tierra */
+/* Sub-órbita (Luna) — centrada respecto a la Tierra */
 .suborbit {
   position: absolute;
-  top: 0; left: 0;
+  top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   border: 1px dashed rgba(148,163,184,0.3);
   border-radius: 9999px;
-  pointer-events: auto; /* mantiene la Luna interactiva */
-  z-index: 5;          /* por debajo del planeta elevamos el planeta a 10 */
+  pointer-events: auto;
+  z-index: 5;
 }
 .subrotator { position: absolute; inset: 0; transform-origin: 50% 50%; animation: spin 18s linear infinite; }
 .subanchor { position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%); }
 
-/* ====== Emoji + Card en hover (más preciso) ====== */
-.planet-wrap{
-  position: relative;
-  isolation: isolate; /* aísla z-index local */
-  z-index: 10;        /* <= default por encima de sub-órbita */
-}
-.planet-wrap:hover,
-.planet-wrap:focus-within{
-  z-index: 99; /* eleva sobre vecinos para click fácil */
-}
+/* ====== Botones (icono/emoji) + Card ====== */
+.planet-wrap{ position: relative; isolation: isolate; z-index: 10; }
+.planet-wrap:hover, .planet-wrap:focus-within{ z-index: 99; }
 
-/* Botón emoji planeta — hitbox reducido */
+/* Botón planeta */
 .planet-emoji-btn {
-  position: relative; /* necesario para el ::after del hitbox */
+  position: relative;
   width: var(--planet-emoji-size);
   height: var(--planet-emoji-size);
   display: grid;
@@ -746,17 +748,23 @@ const css = `
   border-color: rgba(125, 211, 252, 0.45);
 }
 
-/* === Hitbox invisible EXTRA solo para la Tierra === */
+/* Hitbox extra para la Tierra (clic cómodo) */
 .planet-emoji-btn[data-id="Earth"]::after{
   content: "";
   position: absolute;
-  inset: -8px;           /* expande ~8px todo alrededor */
+  inset: -8px;
   border-radius: 9999px;
-  /* sin fondo ni borde: invisible */
-  pointer-events: auto;  /* capta el click y lo delega al botón */
+  pointer-events: auto;
 }
 
-/* Card de planeta — SOLO aparece con hover/focus en el emoji o en la card */
+/* Tamaño del SVG/IMG del planeta (75% del botón) */
+.planet-icon{
+  width:  calc(var(--planet-emoji-size) * 0.75);
+  height: calc(var(--planet-emoji-size) * 0.75);
+  object-fit: contain;
+}
+
+/* Card de planeta */
 .planet-card {
   position: absolute;
   left: 50%;
@@ -794,7 +802,7 @@ const css = `
 .ring-amber   { box-shadow: 0 0 0 4px rgba(245,158,11,0.16) inset; }
 .ring-indigo  { box-shadow: 0 0 0 4px rgba(99,102,241,0.16) inset; }
 
-/* Emoji Luna — hitbox reducido (se mantiene) */
+/* Botón Luna */
 .moon-emoji-btn {
   width: var(--moon-emoji-size);
   height: var(--moon-emoji-size);
@@ -817,7 +825,7 @@ const css = `
   border-color: rgba(167, 139, 250, 0.45);
 }
 
-/* Card de luna — mismo patrón */
+/* Card de luna */
 .moon-card {
   position: absolute;
   left: 50%;
