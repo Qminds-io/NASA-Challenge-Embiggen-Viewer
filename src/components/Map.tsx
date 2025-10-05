@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import "ol/ol.css";
 
@@ -50,79 +50,6 @@ import {
 type DrawMode = "None" | "Point" | "Polygon";
 type Coord = { lon: number; lat: number } | null;
 
-type GibsLayer = {
-  kind: "gibs";
-  id: string; // id GIBS
-  title: string;
-  matrixSet: "GoogleMapsCompatible_Level8" | "GoogleMapsCompatible_Level9";
-  ext: "jpg" | "png";
-};
-
-type TrekBody = "Moon" | "Mars" | "Ceres";
-
-type TrekLayer = {
-  kind: "trek";
-  body: TrekBody;
-  title: string;
-  /** Endpoint REST hasta el nombre de la capa (sin /1.0.0/...). */
-  endpoint: string;
-  format: "jpg" | "png";
-  maxLevel?: number;
-};
-
-type AnyLayer = GibsLayer | TrekLayer;
-
-/* ====== GIBS seguras (Earth) ====== */
-const GIBS_LAYERS: GibsLayer[] = [
-  { kind: "gibs", id: "MODIS_Terra_CorrectedReflectance_TrueColor", title: "🌍 MODIS Terra — True Color",  ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "MODIS_Aqua_CorrectedReflectance_TrueColor",  title: "🌍 MODIS Aqua — True Color",   ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "VIIRS_SNPP_CorrectedReflectance_TrueColor",  title: "🌍 VIIRS SNPP — True Color",   ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "MODIS_Terra_CorrectedReflectance_Bands721",  title: "🌍 MODIS Terra — 7-2-1 (polvo/humo)", ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "MODIS_Terra_CorrectedReflectance_Bands367",  title: "🌍 MODIS Terra — 3-6-7 (vegetación)",   ext: "jpg", matrixSet: "GoogleMapsCompatible_Level9" },
-  { kind: "gibs", id: "BlueMarble_ShadedRelief",                    title: "🌍 Blue Marble — Shaded Relief (estático)",  ext: "jpg", matrixSet: "GoogleMapsCompatible_Level8" },
-  { kind: "gibs", id: "BlueMarble_ShadedRelief_Bathymetry",         title: "🌍 Blue Marble — Relieve + Batimetría",       ext: "jpg", matrixSet: "GoogleMapsCompatible_Level8" },
-  { kind: "gibs", id: "VIIRS_CityLights_2012",                      title: "🌍 City Lights 2012 (nocturno estático)",     ext: "jpg", matrixSet: "GoogleMapsCompatible_Level8" },
-];
-
-/* ====== TREKS (REST, EPSG:4326) ====== */
-const TREK_LAYERS: TrekLayer[] = [
-  { kind: "trek", body: "Mars", title: "🪐 Mars — MOLA Color Shaded Relief (463m)", endpoint: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m", format: "jpg", maxLevel: 10 },
-  { kind: "trek", body: "Mars", title: "🪐 Mars — Viking MDIM21 Color Mosaic (232m)", endpoint: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m", format: "jpg", maxLevel: 10 },
-  { kind: "trek", body: "Moon", title: "🌙 Moon — LRO LOLA Color Shaded (128ppd)", endpoint: "https://trek.nasa.gov/tiles/Moon/EQ/LRO_LOLA_ClrShade_Global_128ppd_v04", format: "png", maxLevel: 8 },
-  { kind: "trek", body: "Ceres", title: "🪐 Ceres — Dawn FC HAMO Color Shaded (60ppd, 2016)", endpoint: "https://trek.nasa.gov/tiles/Ceres/EQ/Ceres_Dawn_FC_HAMO_ClrShade_DLR_Global_60ppd_Oct2016", format: "jpg", maxLevel: 10 },
-];
-
-// Lista plana para búsquedas internas
-const LAYERS: AnyLayer[] = [...GIBS_LAYERS, ...TREK_LAYERS];
-
-/* ===== util fecha ===== */
-function todayISO() {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
-
-/* ===== Estilo de anotaciones ===== */
-const annotationStyle = (feature: FeatureLike) => {
-  const name = feature.get("name") ?? "";
-  const isPoint = feature.getGeometry()?.getType() === "Point";
-  return new Style({
-    image: isPoint
-      ? new CircleStyle({ radius: 6, fill: new Fill({ color: "rgba(255,255,255,0.95)" }), stroke: new Stroke({ color: "#0f172a", width: 2 }) })
-      : undefined,
-    stroke: new Stroke({ color: "#0f172a", width: 2 }),
-    fill: new Fill({ color: "rgba(14,165,233,0.10)" }),
-    text: new Text({
-      text: name,
-      offsetY: isPoint ? -16 : 0,
-      font: "12px Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Helvetica Neue, Arial",
-      padding: [2, 4, 2, 4],
-      backgroundFill: new Fill({ color: "rgba(255,255,255,0.85)" }),
-      backgroundStroke: new Stroke({ color: "#0f172a", width: 1 }),
-    }),
-  });
-};
-
-/* ===== Permalink (#lon,lat,zoom,fecha,layerKey,proj) ===== */
 type PermalinkState = { lon?: number; lat?: number; z?: number; d?: string; k?: string; p?: string };
 
 const GEOJSON_DATA_PROJECTION = "EPSG:4326";
@@ -149,19 +76,25 @@ function readHash(): PermalinkState {
     p: p || undefined,
   };
 }
-function writeHash(view: View, dateISO: string, lkey: string) {
+
+function writeHash(view: View, dateISO: string, layerKey: string) {
+  if (!layerKey) return;
   const proj = view.getProjection().getCode();
   const center = view.getCenter() || [0, 0];
   const [lon, lat] = transform(center, proj, GEOJSON_DATA_PROJECTION);
   const zoom = view.getZoom() ?? 2;
-  window.history.replaceState(null, "", `#${lon.toFixed(5)},${lat.toFixed(5)},${zoom.toFixed(2)},${dateISO},${lkey},${proj}`);
+  window.history.replaceState(
+    null,
+    "",
+    `#${lon.toFixed(5)},${lat.toFixed(5)},${zoom.toFixed(2)},${dateISO},${layerKey},${proj}`
+  );
 }
 
-/* ===== helpers de clave de capa ===== */
-const layerKey = (l: AnyLayer) => (l.kind === "gibs" ? `gibs:${l.id}` : `trek:${l.body}:${l.endpoint}`);
 function parseLayerKey(k?: string) {
   if (!k) return null;
-  if (k.startsWith("gibs:")) return { kind: "gibs" as const, id: k.slice(5) };
+  if (k.startsWith("gibs:")) {
+    return { kind: "gibs" as const, id: k.slice(5) };
+  }
   if (k.startsWith("trek:")) {
     const rest = k.slice(5);
     const firstColon = rest.indexOf(":");
@@ -226,18 +159,12 @@ const layerKey = (layer: LayerItem) => layer.layerKey;
 export default function MapView() {
   const mapDivRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
-  const hash = readHash();
-
-  // Estado UI
-  const [date, setDate] = useState<string>(hash.d ?? todayISO());
-  const dateRef = useRef(date);
-  useEffect(() => { dateRef.current = date; }, [date]);
-
-  const hashParsed = parseLayerKey(hash.k);
-  let defaultLayer: AnyLayer | undefined = LAYERS.find((l) => layerKey(l) === (hash.k ?? ""));
-  if (!defaultLayer && hashParsed?.kind === "gibs") defaultLayer = GIBS_LAYERS[0];
-  else if (!defaultLayer && hashParsed?.kind === "trek") defaultLayer = TREK_LAYERS.find((t) => t.body === hashParsed!.body) ?? TREK_LAYERS[0];
-  if (!defaultLayer) defaultLayer = LAYERS[0];
+  const initialHashRef = useRef<PermalinkState | null>(null);
+  if (initialHashRef.current === null) {
+    initialHashRef.current = readHash();
+  }
+  const hash = initialHashRef.current;
+  const hashParsed = parseLayerKey(hash?.k);
 
   const [date, setDate] = useState<string>(hash?.d ?? todayISO());
   const dateRef = useRef(date);
@@ -268,10 +195,6 @@ export default function MapView() {
   const [annotationsLoading, setAnnotationsLoading] = useState(false);
   const [annotationsError, setAnnotationsError] = useState<string | null>(null);
 
-  // NUEVO: control del panel Notes en móvil
-  const [notesOpen, setNotesOpen] = useState(false);
-
-  // Refs OL
   const mapRef = useRef<Map | null>(null);
   const imageryLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const baseLayerRef = useRef<TileLayer<OSM> | null>(null);
@@ -359,8 +282,7 @@ export default function MapView() {
     };
   }, []);
 
-  // Helpers de carga
-  const attachTileLoadEvents = (src: any) => {
+  const attachTileLoadEvents = (src: XYZ) => {
     const onStart = () => setTilePending((p) => p + 1);
     const onEnd = () => setTilePending((p) => Math.max(0, p - 1));
     const onError = () => {
@@ -376,48 +298,7 @@ export default function MapView() {
       src.un("tileloaderror", onError);
     };
   };
-
-  // Crear capa REST (GIBS o TREK)
-  const makeImageryLayerREST = (sel: TrekLayer | GibsLayer) => {
-    if ((sel as GibsLayer).kind === "gibs") {
-      const gsel = sel as GibsLayer;
-      const src = new XYZ({ url: buildGibsUrl(dateRef.current, gsel), crossOrigin: "anonymous", tilePixelRatio: 1 });
-      const cleanup = attachTileLoadEvents(src);
-      const lyr = new TileLayer({ source: src, opacity, zIndex: 1 });
-      (lyr as any).__cleanup = cleanup;
-      return lyr;
-    } else {
-      const tsel = sel as TrekLayer;
-      const projection = getProj("EPSG:4326")!;
-      const extent = [-180, -90, 180, 90];
-      const size = extentWidth(extent) / 256; // 360/256
-      const max = tsel.maxLevel ?? 10;
-      const resolutions = new Array(max + 1).fill(0).map((_, z) => (size / 2) / Math.pow(2, z));
-      const matrixIds = new Array(max + 1).fill(0).map((_, z) => String(z));
-
-      const grid = new WMTSTileGrid({ origin: [-180, 90], resolutions, matrixIds, tileSize: [256, 256], extent });
-
-      const src = new WMTS({
-        requestEncoding: "REST",
-        url: `${tsel.endpoint}/1.0.0/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.${tsel.format}`,
-        layer: "default",
-        matrixSet: "default028mm",
-        format: tsel.format === "jpg" ? "image/jpeg" : "image/png",
-        style: "default",
-        projection,
-        tileGrid: grid,
-        wrapX: true,
-        crossOrigin: "anonymous",
-      });
-      const cleanup = attachTileLoadEvents(src);
-      const lyr = new TileLayer({ source: src, opacity, zIndex: 1 });
-      (lyr as any).__cleanup = cleanup;
-      return lyr;
-    }
-  };
-
-  // Proyección
-  const ensureProjection = (targetProj: "EPSG:3857" | "EPSG:4326", keepCenter = true) => {
+  const ensureProjection = useCallback((targetLayer: LayerItem, keepCenter = true) => {
     const map = mapRef.current;
     if (!map) return;
     const view = map.getView();
@@ -426,20 +307,31 @@ export default function MapView() {
     const minZoom = targetLayer.minZoom ?? 0;
     const maxZoom = targetLayer.maxZoom ?? 18;
 
-    const centerWgs = keepCenter ? transform(map.getView().getCenter() || [0, 0], currProj, "EPSG:4326") : [0, 0];
+    view.setMinZoom(minZoom);
+    view.setMaxZoom(maxZoom);
 
-    const view = new View({
-      projection: targetProj,
-      center: transform(centerWgs, "EPSG:4326", targetProj),
-      zoom: Math.max(2, Math.min(map.getView().getZoom() ?? 2, 12)),
-    });
-    map.setView(view);
-
-    if (baseLayerRef.current) {
-      map.removeLayer(baseLayerRef.current);
-      baseLayerRef.current = null;
-    }
-    if (targetProj === "EPSG:3857") {
+    if (currentCode !== targetCode) {
+      const centerWgs = keepCenter
+        ? transform(view.getCenter() || [0, 0], currentCode, GEOJSON_DATA_PROJECTION)
+        : [0, 0];
+      const newView = new View({
+        projection: targetCode,
+        center: transform(centerWgs, GEOJSON_DATA_PROJECTION, targetCode),
+        zoom: Math.max(minZoom, Math.min(view.getZoom() ?? 2, maxZoom)),
+        minZoom,
+        maxZoom,
+      });
+      map.setView(newView);
+      if (baseLayerRef.current) {
+        map.removeLayer(baseLayerRef.current);
+        baseLayerRef.current = null;
+      }
+      if (targetCode === "EPSG:3857") {
+        const base = new TileLayer({ source: new OSM(), zIndex: 0 });
+        baseLayerRef.current = base;
+        map.getLayers().insertAt(0, base);
+      }
+    } else if (targetCode === "EPSG:3857" && !baseLayerRef.current) {
       const base = new TileLayer({ source: new OSM(), zIndex: 0 });
       baseLayerRef.current = base;
       map.getLayers().insertAt(0, base);
@@ -481,7 +373,6 @@ export default function MapView() {
     [opacity]
   );
 
-  // Init mapa
   useEffect(() => {
     if (!mapDivRef.current) return;
     if (mapRef.current) return;
@@ -521,11 +412,15 @@ export default function MapView() {
     const annotationsLayer = new VectorLayer({ source: annotationsSource, style: annotationsStyleMemo, zIndex: 2 });
     map.addLayer(annotationsLayer);
 
-    const imagery = makeImageryLayerREST(defaultLayer);
+    const imagery = makeImageryLayer(active);
     imageryLayerRef.current = imagery;
     map.addLayer(imagery);
 
-    const onMove = () => writeHash(map.getView(), dateRef.current, layerKey(active));
+    const onMove = () => {
+      const currentLayer = activeRef.current;
+      if (!currentLayer) return;
+      writeHash(map.getView(), dateRef.current, currentLayer.layerKey);
+    };
     const onPointerMove = (evt: any) => {
       const proj = map.getView().getProjection().getCode();
       const [lon, lat] = transform(evt.coordinate, proj, GEOJSON_DATA_PROJECTION);
@@ -534,7 +429,7 @@ export default function MapView() {
     map.on("moveend", onMove);
     map.on("pointermove", onPointerMove);
 
-    ensureProjection(defaultLayer.kind === "gibs" ? "EPSG:3857" : "EPSG:4326");
+    ensureProjection(active, false);
 
     mapRef.current = map;
     setTimeout(() => map.updateSize(), 0);
@@ -551,7 +446,6 @@ export default function MapView() {
     };
   }, [active, ensureProjection, makeImageryLayer, hash, annotationsStyleMemo]);
 
-  // Cambios de fecha/capa
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -577,12 +471,6 @@ export default function MapView() {
     replaceImagery(newLayer);
   }, [active, date, ensureProjection, makeImageryLayer]);
 
-    const lyr = makeImageryLayerREST(active);
-    replaceImagery(lyr);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, active]);
-
-  // Opacidad
   useEffect(() => {
     if (imageryLayerRef.current) {
       imageryLayerRef.current.setOpacity(opacity);
@@ -795,7 +683,23 @@ export default function MapView() {
     setIsModifyOn(true);
   }, [disableModify, isModifyOn]);
 
-  const deleteSelected = () => {
+  const removeFeature = useCallback(async (feature: Feature) => {
+    if (!annotationsSourceRef.current) return false;
+    const source = annotationsSourceRef.current;
+    const id = feature.getId();
+    if (id) {
+      try {
+        await deleteAnnotation(String(id));
+      } catch (error) {
+        console.error("Failed to delete annotation", error);
+        return false;
+      }
+    }
+    source.removeFeature(feature);
+    return true;
+  }, []);
+
+  const deleteSelected = useCallback(async () => {
     if (!annotationsSourceRef.current) return;
     const source = annotationsSourceRef.current;
     const selected = selectRef.current?.getFeatures();
@@ -820,13 +724,11 @@ export default function MapView() {
     setAnnotKey((k) => k + 1);
   }, [removeFeature]);
 
-  // Export/Import GeoJSON
-  const exportGeoJSON = () => {
-    if (!annotationsSourceRef.current) return;
-    const format = new GeoJSON();
-    const json = format.writeFeatures(annotationsSourceRef.current.getFeatures(), {
-      featureProjection: mapRef.current?.getView().getProjection().getCode() || "EPSG:3857",
-      dataProjection: "EPSG:4326",
+  const exportGeoJSON = useCallback(() => {
+    if (!annotationsSourceRef.current || !mapRef.current) return;
+    const json = geojsonFormatter.writeFeatures(annotationsSourceRef.current.getFeatures(), {
+      dataProjection: GEOJSON_DATA_PROJECTION,
+      featureProjection: mapRef.current.getView().getProjection().getCode(),
       decimals: 6,
     });
     const blob = new Blob([json], { type: "application/json;charset=utf-8" });
@@ -934,31 +836,39 @@ export default function MapView() {
     }
   }, []);
   const layersForNavbar = useMemo(() => {
-    if (active.kind === "gibs") return GIBS_LAYERS.map((l) => ({ id: layerKey(l), title: l.title }));
-    return TREK_LAYERS.filter((t) => t.body === (active as any).body).map((l) => ({ id: layerKey(l), title: l.title }));
-  }, [active]);
+    if (!active) return [];
+    const body = catalog.find((entry) => entry.bodyId === active.bodyId);
+    if (!body) return [];
+    return body.layers.map((layer) => ({ id: layer.layerKey, title: layer.title }));
+  }, [catalog, active]);
 
-  const handleChangeLayer = (key: string) => {
-    const next = LAYERS.find((l) => layerKey(l) === key);
-    if (!next) return;
-    const sameDomain =
-      (active.kind === "gibs" && next.kind === "gibs") ||
-      (active.kind === "trek" && next.kind === "trek" && (next as TrekLayer).body === (active as TrekLayer).body);
-    if (!sameDomain) return;
-    setActive(next);
-    if (drawMode === "Point" || drawMode === "Polygon") {
-      disableDraw();
-      enableDraw(drawMode);
-    }
-  };
+  const handleChangeLayer = useCallback(
+    (key: string) => {
+      if (!active) return;
+      const next = allLayers.find((layer) => layer.layerKey === key);
+      if (!next) return;
+      if (next.bodyId !== active.bodyId) return;
+      setActive(next);
+      if (drawMode === "Point" || drawMode === "Polygon") {
+        disableDraw();
+        enableDraw(drawMode);
+      }
+    },
+    [active, allLayers, drawMode, disableDraw, enableDraw]
+  );
 
-  const handleSetDrawMode = (m: DrawMode) => {
-    setDrawMode(m);
-    if (m === "Point" || m === "Polygon") enableDraw(m);
-    else disableDraw();
-  };
+  const handleSetDrawMode = useCallback(
+    (mode: DrawMode) => {
+      setDrawMode(mode);
+      if (mode === "Point" || mode === "Polygon") {
+        enableDraw(mode);
+      } else {
+        disableDraw();
+      }
+    },
+    [disableDraw, enableDraw]
+  );
 
-  // Atajos de teclado
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === "p") handleSetDrawMode("Point");
@@ -971,9 +881,6 @@ export default function MapView() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [handleSetDrawMode, toggleModify, deleteSelected, resetView]);
-
-  /* ============== RENDER ============== */
-  const annotationsCount = annotationsList.length;
 
   return (
     <div className="h-full w-full relative">
@@ -988,8 +895,6 @@ export default function MapView() {
         </div>
       )}
       <div ref={mapDivRef} className="fixed left-0 right-0 bottom-0" style={{ top: "var(--navbar-h)" }} />
-
-      {/* NAVBAR */}
       <Navbar
         headerRef={headerRef as MutableRefObject<HTMLElement | null>}
         tilePending={tilePending}
@@ -1015,220 +920,102 @@ export default function MapView() {
         cursorCoord={cursorCoord}
       />
 
-      {/* ======== PANEL NOTES ======== */}
-      {/* Desktop: panel lateral como siempre */}
       <aside
-        className="
-          hidden md:flex
-          fixed right-4 z-40 w-80
-          bg-white/80 backdrop-blur border border-slate-200 rounded-xl shadow-xl p-3 flex-col
-        "
+        className="fixed right-4 z-40 w-80 max-w-[90vw] bg-white/80 backdrop-blur border border-slate-200 rounded-xl shadow-xl p-3 flex flex-col"
         style={{ top: "calc(var(--navbar-h) + 12px)", height: "calc(100vh - var(--navbar-h) - 24px)" }}
-        aria-label="Notes panel"
       >
-        <NotesHeader
-          filter={filter}
-          setFilter={setFilter}
-          tileErrors={tileErrors}
-        />
-        <NotesList
-          annotationsList={annotationsList}
-          flyToFeature={flyToFeature}
-          copyCoords={copyCoords}
-          deleteFeature={(f) => { annotationsSourceRef.current?.removeFeature(f); setAnnotKey((k) => k + 1); }}
-          setFilter={setFilter}
-        />
-        <NotesFooter />
-      </aside>
-
-      {/* Móvil: bottom-sheet */}
-      <aside
-        className={`
-          md:hidden fixed left-0 right-0 z-40
-          bg-white/90 backdrop-blur border-t border-slate-200 shadow-2xl
-          transition-transform duration-300
-          ${notesOpen ? "translate-y-0" : "translate-y-[calc(60vh+env(safe-area-inset-bottom,0px))]"}
-        `}
-        style={{
-          top: `calc(100vh - 60vh)`,
-          paddingBottom: "calc(env(safe-area-inset-bottom,0px) + 8px)",
-        }}
-        aria-label="Notes panel móvil"
-      >
-        {/* Handler */}
-        <div className="flex justify-center pt-2">
-          <div className="h-1.5 w-12 rounded-full bg-slate-300" />
+        <div className="flex items-center gap-2 mb-2">
+          <div className="font-extrabold text-slate-900 text-sm">Notes</div>
+          <div className="ml-auto" />
+          <input
+            placeholder="Filtrar..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="px-2 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
+          />
         </div>
 
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 mb-2 mt-2">
-            <div className="font-extrabold text-slate-900 text-sm">Notes</div>
-            <span className="text-xs text-slate-500">({annotationsCount})</span>
-            <div className="ml-auto" />
-            <input
-              placeholder="Filtrar…"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-2 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 w-40"
-            />
-            <button
-              onClick={() => setNotesOpen(false)}
-              className="ml-1 px-3 py-2 text-xs rounded-md border border-slate-300 bg-white hover:bg-slate-50"
-              aria-label="Cerrar Notes"
-            >
-              Cerrar
-            </button>
-          </div>
+        <div className="text-[11px] text-rose-600 mb-2">
+          {tileErrors > 0
+            ? `Errores de carga: ${tileErrors}`
+            : annotationsError
+            ? `Anotaciones: ${annotationsError}`
+            : " "}
+        </div>
+        {annotationsLoading && (
+          <div className="text-[11px] text-slate-500 mb-2">Sincronizando anotaciones...</div>
+        )}
 
-          <div className="text-[11px] text-rose-600 mb-1 min-h-[14px]">
-            {tileErrors > 0 ? `Errores de carga: ${tileErrors}` : " "}
-          </div>
+        <div className="overflow-auto min-h-0">
+          {annotationsList.length === 0 ? (
+            <div className="text-sm text-slate-600">
+              There are no annotations. Use <b>Point</b> or <b>Polygon</b>.
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {annotationsList.map(({ feature, name, lon, lat, type }, index) => (
+                <li key={index} className="border border-slate-200 rounded-lg p-2 bg-white">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold text-sm text-slate-900 truncate">{name}</div>
+                    <span className="text-xs text-slate-500">{type}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {Number.isFinite(lon) && Number.isFinite(lat) ? `${lon.toFixed(4)}, ${lat.toFixed(4)}` : "--"}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => flyToFeature(feature)}
+                      className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
+                    >
+                      Go
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newName = window.prompt("Cambiar nombre:", name) ?? name;
+                        feature.set("name", newName);
+                        setFilter((value) => value + "");
+                      }}
+                      className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
+                    >
+                      Rename
+                    </button>
+                    {Number.isFinite(lon) && Number.isFinite(lat) && (
+                      <button
+                        onClick={() => copyCoords(lon, lat)}
+                        className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
+                      >
+                        Copy coords
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        const success = await removeFeature(feature);
+                        if (!success) {
+                          alert("No se pudo borrar la anotacion.");
+                          return;
+                        }
+                        setAnnotKey((k) => k + 1);
+                      }}
+                      className="px-2 py-1 text-xs rounded border border-rose-300 bg-rose-100 hover:bg-rose-200"
+                      title="Borrar esta anotacion"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-          <div className="h-[50vh] overflow-auto -mx-1 px-1">
-            <NotesList
-              annotationsList={annotationsList}
-              flyToFeature={flyToFeature}
-              copyCoords={copyCoords}
-              deleteFeature={(f) => { annotationsSourceRef.current?.removeFeature(f); setAnnotKey((k) => k + 1); }}
-              setFilter={setFilter}
-            />
-            <div className="py-2" />
-          </div>
-
-          <NotesFooter className="mt-2" />
+        <div className="mt-3 text-[11px] text-slate-500">
+          Imagery © NASA EOSDIS GIBS / Worldview · NASA Solar System Treks
         </div>
       </aside>
 
-      {/* FAB para abrir Notes en móvil */}
-      <button
-        onClick={() => setNotesOpen((v) => !v)}
-        className="
-          md:hidden fixed right-3 z-40
-          rounded-full shadow-lg border border-slate-300 bg-white/90 backdrop-blur
-          active:scale-[0.98] transition
-          flex items-center gap-2
-        "
-        style={{
-          bottom: "calc(env(safe-area-inset-bottom,0px) + 12px)",
-          padding: "10px 12px"
-        }}
-        aria-expanded={notesOpen}
-        aria-controls="notes-bottom-sheet"
-        aria-label="Abrir Notes"
-        title="Notes"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="opacity-80">
-          <path d="M9 4h10a1 1 0 0 1 1 1v10M9 4v10a1 1 0 0 1-1 1H4M9 4l11 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        <span className="text-sm font-semibold text-slate-800">Notes</span>
-        <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-white">{annotationsCount}</span>
-      </button>
-
-      {/* Pie discreto */}
       <div className="fixed bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 border border-slate-200 rounded-md px-2 py-1 shadow-sm">
         Scale in the corner of the map · Shortcuts: P/G/N/E/Del/R
       </div>
-
-      {/* CSS para safe-area y ajustes menores */}
-      <style>{`
-        @supports (padding: max(0px)) {
-          :root { --safe-bottom: env(safe-area-inset-bottom, 0px); }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-/* ===== Subcomponentes de Notes (reutilizados en desktop y móvil) ===== */
-function NotesHeader({
-  filter, setFilter, tileErrors,
-}: {
-  filter: string;
-  setFilter: (v: string) => void;
-  tileErrors: number;
-}) {
-  return (
-    <>
-      <div className="flex items-center gap-2 mb-2">
-        <div className="font-extrabold text-slate-900 text-sm">Notes</div>
-        <div className="ml-auto" />
-        <input
-          placeholder="Filtrar…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="px-2 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
-        />
-      </div>
-      <div className="text-[11px] text-rose-600 mb-2">{tileErrors > 0 ? `Errores de carga: ${tileErrors}` : " "}</div>
-    </>
-  );
-}
-
-function NotesList({
-  annotationsList,
-  flyToFeature,
-  copyCoords,
-  deleteFeature,
-  setFilter,
-}: {
-  annotationsList: { feature: Feature; name: string; lon: number; lat: number; type: string | undefined }[];
-  flyToFeature: (f: Feature) => void;
-  copyCoords: (lon: number, lat: number) => void;
-  deleteFeature: (f: Feature) => void;
-  setFilter: (v: string) => void;
-}) {
-  if (annotationsList.length === 0) {
-    return (
-      <div className="text-sm text-slate-600">
-        There are no annotations. Use <b>Point</b> or <b>Polygon</b>.
-      </div>
-    );
-  }
-
-  return (
-    <ul className="space-y-2">
-      {annotationsList.map(({ feature, name, lon, lat, type }, i) => (
-        <li key={i} className="border border-slate-200 rounded-lg p-2 bg-white">
-          <div className="flex items-center justify-between gap-2">
-            <div className="font-semibold text-sm text-slate-900 truncate">{name}</div>
-            <span className="text-xs text-slate-500">{type}</span>
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            {Number.isFinite(lon) && Number.isFinite(lat) ? `${lon.toFixed(4)}, ${lat.toFixed(4)}` : "—"}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <button onClick={() => flyToFeature(feature)} className="px-3 py-2 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.99]">Ir</button>
-            <button
-              onClick={() => {
-                const newName = window.prompt("Cambiar nombre:", name) ?? name;
-                feature.set("name", newName);
-                setFilter(""); // refrescar
-              }}
-              className="px-3 py-2 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.99]"
-            >
-              Renombrar
-            </button>
-            {Number.isFinite(lon) && Number.isFinite(lat) && (
-              <button onClick={() => copyCoords(lon, lat)} className="px-3 py-2 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.99]">Copiar coords</button>
-            )}
-            <button
-              onClick={() => deleteFeature(feature)}
-              className="px-3 py-2 text-xs rounded border border-rose-300 bg-rose-100 hover:bg-rose-200 active:scale-[0.99]"
-              title="Borrar esta anotación"
-            >
-              Borrar
-            </button>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function NotesFooter({ className = "" }: { className?: string }) {
-  return (
-    <div className={`mt-3 text-[11px] text-slate-500 ${className}`}>
-      Imagery © NASA EOSDIS GIBS / Worldview · NASA Solar System Treks
     </div>
   );
 }
