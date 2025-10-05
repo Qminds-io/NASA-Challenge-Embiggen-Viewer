@@ -22,6 +22,32 @@ Qué hace
 
 * * * * *
 
+Instalacion
+-----------
+
+1.  Requisitos: Node.js 18 o superior (recomendado 20). Ten a mano un gestor de paquetes: pnpm, yarn o npm.
+
+2.  Clonar el repositorio: entra a tu terminal, ve a la carpeta donde trabajarás y ejecuta: git clone <URL de tu repo>. Luego entra a la carpeta del proyecto con: cd <carpeta del repo>.
+
+3.  Instalar dependencias:
+
+-   Con pnpm: pnpm install
+
+-   Con yarn: yarn
+
+-   Con npm: npm install
+
+4.  Ejecutar en desarrollo:
+
+-   Con pnpm: pnpm dev
+
+-   Con yarn: yarn dev
+
+-   Con npm: npm run dev\
+    Abre el navegador en la URL que muestre Vite (normalmente <http://localhost:5173>[](http://localhost:5173))
+
+* * * * *
+
 Tecnologías y librerías
 -----------------------
 
