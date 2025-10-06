@@ -1,11 +1,11 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchLayersCatalog, type LayersCatalog } from "../services/api";
 
-/* ========= config logo ========= */
-const LOGO_SRC = "/Logo.png"; // ruta del logo (SVG/PNG)
+/* ========= logo config ========= */
+const LOGO_SRC = "/Logo.png"; // Logo image path (SVG/PNG)
 
-/* ========= util ========= */
+/* ========= utilities ========= */
 function todayISO() {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
@@ -13,14 +13,14 @@ function todayISO() {
     .slice(0, 10);
 }
 
-/** Sincroniza animación con tiempo real (fase) */
+/** Synchronize animation with real time (phase) */
 function realTimeDelaySeconds(durationSec: number): string {
   const nowSec = Date.now() / 1000;
   const progress = nowSec % durationSec;
   return `-${progress}s`;
 }
 
-/** Config genÃ©rica de cuerpos */
+/** Generic celestial body configuration */
 type Proj = "EPSG:3857" | "EPSG:4326";
 type BodyId =
   | "Sun"
@@ -39,45 +39,45 @@ type BodyId =
 type BodyConfig = {
   id: BodyId;
   name: string;
-  emoji: string;       // fallback si no hay icono
-  iconSrc?: string;    // ruta a SVG en /public/icons
-  ring?: number;       // órbita (1 = más interna)
-  isMoonOf?: BodyId;   // si es luna, planeta padre
+  emoji: string;       // fallback emoji when no icon is available
+  iconSrc?: string;    // path to SVG in /public/icons
+  ring?: number;       // Orbit index (1 = innermost)
+  isMoonOf?: BodyId;   // Parent planet if this is a moon
   enabled: boolean;
-  key?: string;        // clave del viewer (Map.tsx)
+  key?: string;        // Viewer key (Map.tsx)
   proj?: Proj;
-  label?: string;      // caption visible
+  label?: string;      // Visible caption
   tooltip: { title: string; lines: string[] };
   theme?: "earth" | "mars" | "ceres" | "venus" | "mercury" | "gas";
 };
 
-/** === Catálogo ===
- * Asegúrate de tener los SVG en /public/icons/<nombre>.svg
+/** === Catalog ===
+ * Make sure to store the SVGs in /public/icons/<name>.svg
  */
 const BODIES: BodyConfig[] = [
   {
     id: "Earth",
-    name: "Tierra",
+    name: "Earth",
     emoji: "🌍",
     iconSrc: "/icons/tierra.png",
     ring: 2,
     enabled: true,
     key: "gibs:MODIS_Terra_CorrectedReflectance_TrueColor",
     proj: "EPSG:3857",
-    label: "GIBS — MODIS Terra True Color",
+    label: "GIBS - MODIS Terra True Color",
     tooltip: {
-      title: "Tierra",
+      title: "Earth",
       lines: [
-        "Fuente: NASA EOSDIS GIBS",
-        "Capa por defecto: MODIS Terra True Color",
-        "Proyección: EPSG:3857 (Web Mercator)",
+        "Source: NASA EOSDIS GIBS",
+        "Default layer: MODIS Terra True Color",
+        "Projection: EPSG:3857 (Web Mercator)",
       ],
     },
     theme: "earth",
   },
   {
     id: "Mars",
-    name: "Marte",
+    name: "Mars",
     emoji: "🪐",
     iconSrc: "/icons/marte.png",
     ring: 3,
@@ -86,11 +86,11 @@ const BODIES: BodyConfig[] = [
     proj: "EPSG:4326",
     label: "MOLA Color/Shaded (463m)",
     tooltip: {
-      title: "Marte",
+      title: "Mars",
       lines: [
-        "Fuente: NASA Solar System Treks",
-        "Capa por defecto: MGS MOLA Color/Shaded",
-        "Proyección: EPSG:4326 (WGS84)",
+        "Source: NASA Solar System Treks",
+        "Default layer: MGS MOLA Color/Shaded",
+        "Projection: EPSG:4326 (WGS84)",
       ],
     },
     theme: "mars",
@@ -108,18 +108,18 @@ const BODIES: BodyConfig[] = [
     tooltip: {
       title: "Ceres",
       lines: [
-        "Fuente: NASA Solar System Treks",
-        "Capa por defecto: Dawn FC HAMO (Color/Shaded)",
-        "Proyección: EPSG:4326 (WGS84)",
+        "Source: NASA Solar System Treks",
+        "Default layer: Dawn FC HAMO (Color/Shaded)",
+        "Projection: EPSG:4326 (WGS84)",
       ],
     },
     theme: "ceres",
   },
 
-  // Lunas habilitadas
+  // Enabled moons
   {
     id: "Moon",
-    name: "Luna",
+    name: "Moon",
     emoji: "🌙",
     iconSrc: "/icons/moon.svg",
     isMoonOf: "Earth",
@@ -128,25 +128,25 @@ const BODIES: BodyConfig[] = [
     proj: "EPSG:4326",
     label: "LRO LOLA Color/Shaded (128ppd)",
     tooltip: {
-      title: "Luna",
+      title: "Moon",
       lines: [
-        "Fuente: NASA Solar System Treks",
-        "Capa por defecto: LRO LOLA Color/Shaded",
-        "Proyección: EPSG:4326 (WGS84)",
+        "Source: NASA Solar System Treks",
+        "Default layer: LRO LOLA Color/Shaded",
+        "Projection: EPSG:4326 (WGS84)",
       ],
     },
     theme: "earth",
   },
 
-  // Próximos (deshabilitados por ahora, pero con iconos listos)
+  // Coming soon (disabled for now, icons ready)
   {
     id: "Mercury",
-    name: "Mercurio",
+    name: "Mercury",
     emoji: "☿️",
     iconSrc: "/icons/mercurio.png",
     ring: 1,
     enabled: false,
-    tooltip: { title: "Mercurio", lines: ["Próximamente."] },
+    tooltip: { title: "Mercury", lines: ["Coming soon."] },
     theme: "mercury",
   },
   {
@@ -156,7 +156,7 @@ const BODIES: BodyConfig[] = [
     iconSrc: "/icons/venus.png",
     ring: 1.6 as any,
     enabled: false,
-    tooltip: { title: "Venus", lines: ["Próximamente."] },
+    tooltip: { title: "Venus", lines: ["Coming soon."] },
     theme: "venus",
   },
   {
@@ -166,17 +166,17 @@ const BODIES: BodyConfig[] = [
     iconSrc: "/icons/urano.png",
     ring: 4.6 as any,
     enabled: false,
-    tooltip: { title: "Vesta", lines: ["Próximamente."] },
+    tooltip: { title: "Vesta", lines: ["Coming soon."] },
     theme: "ceres",
   },
   {
     id: "Jupiter",
-    name: "Júpiter",
+    name: "Jupiter",
     emoji: "♃",
     iconSrc: "/icons/jupiter.png",
     ring: 6,
     enabled: false,
-    tooltip: { title: "Júpiter", lines: ["Próximamente."] },
+    tooltip: { title: "Jupiter", lines: ["Coming soon."] },
     theme: "gas",
   },
   {
@@ -186,7 +186,7 @@ const BODIES: BodyConfig[] = [
     iconSrc: "/icons/saturno.png",
     ring: 7,
     enabled: false,
-    tooltip: { title: "Saturno", lines: ["Próximamente."] },
+    tooltip: { title: "Saturn", lines: ["Coming soon."] },
     theme: "gas",
   },
   {
@@ -196,22 +196,22 @@ const BODIES: BodyConfig[] = [
     iconSrc: "/icons/europa.svg",
     isMoonOf: "Jupiter",
     enabled: false,
-    tooltip: { title: "Europa (Luna de Júpiter)", lines: ["Próximamente."] },
+    tooltip: { title: "Europa (Moon of Jupiter)", lines: ["Coming soon."] },
     theme: "gas",
   },
   {
     id: "Titan",
-    name: "Titán",
+    name: "Titan",
     emoji: "🟤",
     iconSrc: "/icons/titan.svg",
     isMoonOf: "Saturn",
     enabled: false,
-    tooltip: { title: "Titán (Luna de Saturno)", lines: ["Próximamente."] },
+    tooltip: { title: "Titan (Moon of Saturn)", lines: ["Coming soon."] },
     theme: "gas",
   },
 ];
 
-/* ========= Vista principal ========= */
+/* ========= main view ========= */
 export default function SolarSystem() {
   const navigate = useNavigate();
   const [catalog, setCatalog] = useState<LayersCatalog>([]);
@@ -232,7 +232,7 @@ export default function SolarSystem() {
         if (cancelled) return;
         console.error("Failed to load layer catalog", error);
         setCatalogStatus("error");
-        setCatalogError(error instanceof Error ? error.message : "No se pudo cargar el catalogo");
+        setCatalogError(error instanceof Error ? error.message : "Failed to load the catalog");
       });
     return () => {
       cancelled = true;
@@ -270,7 +270,7 @@ export default function SolarSystem() {
 
   return (
     <div className="min-h-screen relative bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100 overflow-hidden">
-      {/* Encabezado */}
+      {/* Header */}
       <div className="max-w-6xl mx-auto px-4 pt-6">
         <div className="flex items-center gap-3">
           <img
@@ -281,7 +281,7 @@ export default function SolarSystem() {
             decoding="async"
           />
           <h1 className="text-xl font-extrabold tracking-tight">
-            Quantic View â€” Solar System
+            Quantic View - Solar System
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-300">
@@ -291,17 +291,17 @@ export default function SolarSystem() {
           <div className="mt-3 text-xs text-rose-400">{catalogError}</div>
         )}
         {catalogStatus === "loading" && (
-          <div className="mt-3 text-xs text-slate-300">Cargando catalogo...</div>
+          <div className="mt-3 text-xs text-slate-300">Loading catalog...</div>
         )}
 
       </div>
 
-      {/* Diagrama orbital (md+) */}
+      {/* Orbital diagram (md+) */}
       <div className="hidden md:block">
         <SolarDiagram bodies={bodiesList} onOpen={openBody} />
       </div>
 
-      {/* Fallback mÃ³vil: tarjetas solo de habilitados */}
+      {/* Mobile fallback: enabled bodies only */}
       <div className="block md:hidden max-w-6xl mx-auto px-4 pb-14">
         <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 mt-6">
           {enabledBodies.map((b) => (
@@ -335,19 +335,19 @@ export default function SolarSystem() {
         </div>
 
         <div className="mt-10 text-xs text-slate-400">
-          Fuentes: NASA EOSDIS GIBS Â· NASA Solar System Treks.
+          Sources: NASA EOSDIS GIBS / NASA Solar System Treks.
         </div>
       </div>
 
-      {/* Repositorios (inferior izquierda) */}
+      {/* Repositories (bottom left) */}
       <div
         className="fixed left-3 bottom-3 z-40 max-w-[88vw] md:max-w-xs"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-        aria-label="Repositorios del proyecto"
+        aria-label="Project repositories"
       >
         <div className="rounded-xl border border-white/10 bg-white/10 backdrop-blur px-3 py-2 shadow-lg">
           <div className="text-[11px] uppercase tracking-wide text-slate-300 mb-1">
-            Repositorios
+            Repositories
           </div>
           <ul className="text-sm text-slate-100 space-y-1">
             <li>
@@ -355,7 +355,7 @@ export default function SolarSystem() {
                 href="https://github.com/Qminds-io/NASA-Challenge-Embiggen-Viewer"
                 target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 hover:text-sky-300 hover:underline underline-offset-2"
-                title="Abrir repo del Viewer"
+                title="Open viewer repository"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="opacity-90">
                   <path fillRule="evenodd" d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.41-1.35-1.78-1.35-1.78-1.1-.75.09-.73.09-.73 1.22.09 1.86 1.26 1.86 1.26 1.08 1.86 2.82 1.32 3.5 1.01.11-.79.42-1.32.76-1.62-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.16 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.67 1.64.25 2.86.13 3.16.77.84 1.23 1.91 1.23 3.22 0 4.6-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0 0 0 12 .5Z" />
@@ -368,7 +368,7 @@ export default function SolarSystem() {
                 href="https://github.com/Qminds-io/NASA-challenge-embiggen-api"
                 target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 hover:text-sky-300 hover:underline underline-offset-2"
-                title="Abrir repo de la API"
+                title="Open API repository"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="opacity-90">
                   <path fillRule="evenodd" d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.04-1.61-4.04-1.61-.55-1.41-1.35-1.78-1.35-1.78-1.1-.75.09-.73.09-.73 1.22.09 1.86 1.26 1.86 1.26 1.08 1.86 2.82 1.32 3.5 1.01.11-.79.42-1.32.76-1.62-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.16 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.67 1.64.25 2.86.13 3.16.77.84 1.23 1.91 1.23 3.22 0 4.6-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0  0 0 12 .5Z" />
@@ -380,13 +380,13 @@ export default function SolarSystem() {
         </div>
       </div>
 
-      {/* CSS embebido */}
+      {/* Embedded CSS */}
       <style>{css}</style>
     </div>
   );
 }
 
-/* =============== Diagrama con Ã³rbitas animadas y dinÃ¡micas =============== */
+/* =============== Diagram with animated and dynamic orbits =============== */
 
 function SolarDiagram({
   bodies,
@@ -406,13 +406,13 @@ function SolarDiagram({
       className="relative mx-auto mt-8 mb-16"
       style={{ width: "min(92vmin, 900px)", height: "min(92vmin, 900px)" }}
     >
-      {/* Sol (decorativo) */}
+      {/* Sun (decorative) */}
       <div className="solar-center">
         <div className="sun-glow" />
         <div className="sun-core" />
       </div>
 
-      {/* Ã“rbitas */}
+      {/* Orbits */}
       {rings.map((ring) => {
         const radius = ringRadius(ring);
         const durSec = durationSeconds(ring);
@@ -459,7 +459,7 @@ function SolarDiagram({
                         disabled={!p.enabled}
                       />
 
-                      {/* Sub-órbita Luna (centrada respecto a Tierra) */}
+                      {/* Moon sub-orbit (centered on Earth) */}
                       {p.id === "Earth" &&
                         earthMoons.map((m) => {
                           const moonDurSec = 18;
@@ -483,9 +483,9 @@ function SolarDiagram({
         );
       })}
 
-      {/* Leyenda */}
+      {/* Legend */}
       <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-xs text-slate-400">
-        Fuentes: NASA EOSDIS GIBS Â· NASA Solar System Treks
+        Sources: NASA EOSDIS GIBS / NASA Solar System Treks
       </div>
     </div>
   );
@@ -533,7 +533,7 @@ function SubOrbitMoon({
   );
 }
 
-/* =============== Botones con icono/emoji + card on hover =============== */
+/* =============== Buttons with icon/emoji + card on hover =============== */
 
 function PlanetButton({
   id,
@@ -569,7 +569,7 @@ function PlanetButton({
 
   return (
     <div className="planet-wrap group inline-flex items-center justify-center">
-      {/* Icono visible (SVG o emoji fallback) */}
+      {/* Visible icon (SVG or emoji fallback) */}
       <button
         data-id={id}
         onClick={onClick}
@@ -592,7 +592,7 @@ function PlanetButton({
         <span className="sr-only">{label}</span>
       </button>
 
-      {/* Card (aparece al hover/focus) */}
+      {/* Card (visible on hover/focus) */}
       <button
         onClick={onClick}
         disabled={disabled}
@@ -601,7 +601,7 @@ function PlanetButton({
         tabIndex={-1}
       >
         <div className="font-semibold text-sm">{label}</div>
-        <div className="text-[11px] opacity-80">{caption || "PrÃ³ximamente"}</div>
+        <div className="text-[11px] opacity-80">{caption || "Coming soon"}</div>
       </button>
     </div>
   );
@@ -641,13 +641,13 @@ function MiniMoonButton({
         tabIndex={-1}
       >
         <div className="text-[13px] font-semibold text-slate-100">{title}</div>
-        <div className="text-[11px] opacity-80">{caption || "PrÃ³ximamente"}</div>
+        <div className="text-[11px] opacity-80">{caption || "Coming soon"}</div>
       </button>
     </div>
   );
 }
 
-/* =============== Fallback cards (mÃ³vil) =============== */
+/* =============== Fallback cards (mobile) =============== */
 
 function PlanetCard({
   name,
@@ -681,7 +681,7 @@ function PlanetCard({
           onClick={onOpen}
           className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-sky-300/40 bg-sky-300/10 hover:bg-sky-300/20 text-sm"
         >
-          Abrir mapa
+          Open map
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-80">
             <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -691,7 +691,7 @@ function PlanetCard({
   );
 }
 
-/* =============== Helpers visuales =============== */
+/* =============== Visual helpers =============== */
 
 function ringRadius(ring: number | undefined): string {
   const base = 30; // vmin
@@ -706,15 +706,15 @@ function durationSeconds(ring: number | undefined): number {
   return base + step * (Number(ring ?? 1) - 1);
 }
 
-/* =============== CSS especÃ­fico del diagrama =============== */
+/* =============== Diagram-specific CSS =============== */
 
 const css = `
 :root{
-  --planet-emoji-size: 2.8rem; /* diámetro del botón del planeta */
-  --moon-emoji-size:   2.4rem; /* diámetro del botón de la luna */
+  --planet-emoji-size: 2.8rem; /* planet button diameter */
+  --moon-emoji-size:   2.4rem; /* moon button diameter */
 }
 
-/* Centro del sistema (decorativo) */
+/* System center (decorative) */
 .solar-center {
   position: absolute;
   inset: 50% auto auto 50%;
@@ -739,10 +739,10 @@ const css = `
   z-index: 1;
 }
 
-/* No capturar eventos del sol */
+/* Do not capture sun events */
 .solar-center, .sun-core, .sun-glow { pointer-events: none; }
 
-/* Ã“rbitas (anillos) */
+/* Orbits (rings) */
 .orbit {
   position: absolute;
   top: 50%;
@@ -757,10 +757,10 @@ const css = `
 .rotator { position: absolute; inset: 0; transform-origin: 50% 50%; animation: spin 120s linear infinite; }
 .counter { transform-origin: center; }
 
-/* Ancla: planeta en el borde derecho de cada órbita */
+/* Anchor: planet on the right edge of each orbit */
 .anchor { position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%); }
 
-/* Sub-órbita (Luna) — centrada respecto a la Tierra */
+/* Moon sub-orbit - centered relative to Earth */
 .suborbit {
   position: absolute;
   top: 50%; left: 50%;
@@ -773,11 +773,11 @@ const css = `
 .subrotator { position: absolute; inset: 0; transform-origin: 50% 50%; animation: spin 18s linear infinite; }
 .subanchor { position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%); }
 
-/* ====== Botones (icono/emoji) + Card ====== */
+/* ====== Buttons (icon/emoji) + Card ====== */
 .planet-wrap{ position: relative; isolation: isolate; z-index: 10; }
 .planet-wrap:hover, .planet-wrap:focus-within{ z-index: 99; }
 
-/* Botón planeta */
+/* Planet button */
 .planet-emoji-btn {
   position: relative;
   width: var(--planet-emoji-size);
@@ -801,7 +801,7 @@ const css = `
   border-color: rgba(125, 211, 252, 0.45);
 }
 
-/* Hitbox extra para la Tierra (clic cómodo) */
+/* Extra hitbox for Earth (comfortable click) */
 .planet-emoji-btn[data-id="Earth"]::after{
   content: "";
   position: absolute;
@@ -810,14 +810,14 @@ const css = `
   pointer-events: auto;
 }
 
-/* Tamaño del SVG/IMG del planeta (75% del botón) */
+/* Planet SVG/IMG size (75% of the button) */
 .planet-icon{
   width:  calc(var(--planet-emoji-size) * 0.75);
   height: calc(var(--planet-emoji-size) * 0.75);
   object-fit: contain;
 }
 
-/* Card de planeta */
+/* Planet card */
 .planet-card {
   position: absolute;
   left: 50%;
@@ -847,7 +847,7 @@ const css = `
   transform: translateX(-50%) translateY(-2px);
 }
 
-/* Aros de color para card */
+/* Colored rings for card */
 .ring-emerald { box-shadow: 0 0 0 4px rgba(16,185,129,0.16) inset; }
 .ring-rose    { box-shadow: 0 0 0 4px rgba(244,63,94,0.16) inset; }
 .ring-cyan    { box-shadow: 0 0 0 4px rgba(34,211,238,0.16) inset; }
@@ -855,7 +855,7 @@ const css = `
 .ring-amber   { box-shadow: 0 0 0 4px rgba(245,158,11,0.16) inset; }
 .ring-indigo  { box-shadow: 0 0 0 4px rgba(99,102,241,0.16) inset; }
 
-/* Botón Luna */
+/* Moon button */
 .moon-emoji-btn {
   width: var(--moon-emoji-size);
   height: var(--moon-emoji-size);
@@ -878,7 +878,7 @@ const css = `
   border-color: rgba(167, 139, 250, 0.45);
 }
 
-/* Card de luna */
+/* Moon card */
 .moon-card {
   position: absolute;
   left: 50%;
@@ -906,7 +906,7 @@ const css = `
   transform: translateX(-50%) translateY(-2px);
 }
 
-/* Animaciones */
+/* Animations */
 @keyframes spin    { to { transform: rotate(360deg); } }
 @keyframes spin-rev{ to { transform: rotate(-360deg); } }
 `;

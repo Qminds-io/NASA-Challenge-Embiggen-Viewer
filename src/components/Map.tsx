@@ -221,7 +221,7 @@ export default function MapView() {
         console.error("Failed to load layers catalog", error);
         setCatalogStatus("error");
         setCatalogError(
-          error instanceof Error ? error.message : "No se pudo cargar el catalogo de capas."
+          error instanceof Error ? error.message : "Failed to load the layer catalog."
         );
       });
     return () => {
@@ -612,7 +612,7 @@ export default function MapView() {
     } catch (error) {
       console.error("Failed to load annotations", error);
       setAnnotationsError(
-        error instanceof Error ? error.message : "No se pudieron cargar las anotaciones."
+        error instanceof Error ? error.message : "Failed to load annotations."
       );
     } finally {
       setAnnotationsLoading(false);
@@ -650,14 +650,14 @@ export default function MapView() {
       const draw = new Draw({ source: annotationsSourceRef.current, type });
       draw.on("drawend", (evt) => {
         const feature = evt.feature;
-        const name = window.prompt("Nombre/etiqueta para esta anotacion:", "") ?? "";
+        const name = window.prompt("Name/label for this annotation:", "") ?? "";
         if (name) feature.set("name", name);
         persistAnnotation(feature)
           .then(() => {
             setAnnotKey((k) => k + 1);
           })
           .catch(() => {
-            alert("No se pudo guardar la anotacion. Intenta nuevamente.");
+            alert("Could not save the annotation. Try again.");
             annotationsSourceRef.current?.removeFeature(feature);
           });
       });
@@ -719,7 +719,7 @@ export default function MapView() {
       if (!success) failures.push(feature);
     }
     if (failures.length > 0) {
-      alert("Algunas anotaciones no se pudieron eliminar.");
+      alert("Some annotations could not be deleted.");
     }
     setAnnotKey((k) => k + 1);
   }, [removeFeature]);
@@ -765,7 +765,7 @@ export default function MapView() {
             setAnnotKey((k) => k + 1);
           } catch (error) {
             console.error("Cannot import GeoJSON", error);
-            alert("No se pudo importar el GeoJSON.");
+            alert("Could not import the GeoJSON.");
           }
         })();
       };
@@ -886,7 +886,7 @@ export default function MapView() {
     <div className="h-full w-full relative">
       {catalogStatus === "loading" && (
         <div className="pointer-events-none fixed top-[calc(var(--navbar-h)+12px)] left-1/2 z-50 -translate-x-1/2 rounded-md border border-slate-200 bg-white/90 px-3 py-1 text-xs text-slate-600 shadow">
-          Cargando catalogo de capas...
+          Loading layer catalog...
         </div>
       )}
       {catalogStatus === "error" && catalogError && (
@@ -928,7 +928,7 @@ export default function MapView() {
           <div className="font-extrabold text-slate-900 text-sm">Notes</div>
           <div className="ml-auto" />
           <input
-            placeholder="Filtrar..."
+            placeholder="Filter..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="px-2 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
@@ -937,13 +937,13 @@ export default function MapView() {
 
         <div className="text-[11px] text-rose-600 mb-2">
           {tileErrors > 0
-            ? `Errores de carga: ${tileErrors}`
+            ? `Load errors: ${tileErrors}`
             : annotationsError
-            ? `Anotaciones: ${annotationsError}`
+            ? `Annotations: ${annotationsError}`
             : " "}
         </div>
         {annotationsLoading && (
-          <div className="text-[11px] text-slate-500 mb-2">Sincronizando anotaciones...</div>
+          <div className="text-[11px] text-slate-500 mb-2">Syncing annotations...</div>
         )}
 
         <div className="overflow-auto min-h-0">
@@ -971,7 +971,7 @@ export default function MapView() {
                     </button>
                     <button
                       onClick={() => {
-                        const newName = window.prompt("Cambiar nombre:", name) ?? name;
+                        const newName = window.prompt("Rename:", name) ?? name;
                         feature.set("name", newName);
                         setFilter((value) => value + "");
                       }}
@@ -991,13 +991,13 @@ export default function MapView() {
                       onClick={async () => {
                         const success = await removeFeature(feature);
                         if (!success) {
-                          alert("No se pudo borrar la anotacion.");
+                          alert("Could not delete the annotation.");
                           return;
                         }
                         setAnnotKey((k) => k + 1);
                       }}
                       className="px-2 py-1 text-xs rounded border border-rose-300 bg-rose-100 hover:bg-rose-200"
-                      title="Borrar esta anotacion"
+                      title="Delete this annotation"
                     >
                       Delete
                     </button>
@@ -1009,12 +1009,12 @@ export default function MapView() {
         </div>
 
         <div className="mt-3 text-[11px] text-slate-500">
-          Imagery © NASA EOSDIS GIBS / Worldview · NASA Solar System Treks
+          Imagery (c) NASA EOSDIS GIBS / Worldview - NASA Solar System Treks
         </div>
       </aside>
 
       <div className="fixed bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 border border-slate-200 rounded-md px-2 py-1 shadow-sm">
-        Scale in the corner of the map · Shortcuts: P/G/N/E/Del/R
+        Scale in the corner of the map - Shortcuts: P/G/N/E/Del/R
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-/* CSS mínimo para que Aladin Lite sea usable sin CDN oficial */
+/* Minimal CSS to keep Aladin Lite usable without the official CDN */
 .aladin-container, .aladin-box, .aladin-zoomGrp, .aladin-location, .aladin-status-bar,
 .aladin-fullScreen-control, .aladin-settings-control, .aladin-projection-control,
 .aladin-stack-control, .aladin-grid-control, .aladin-share-control {
@@ -36,7 +36,7 @@
   background: rgba(31,41,55,.6);
 }
 
-/* Asegurar que el canvas ocupe todo el contenedor negro que le dimos */
+/* Ensure the canvas fills the dark container we created */
 #aladin-lite-div, .aladin-container, canvas {
   width: 100% !important;
   height: 100% !important;

@@ -59,7 +59,7 @@ Data sources
 
 -   **NASA Solar System Treks** (Moon, Mars, Ceres): global **WMTS** services, consumed with WMTS grid in **EPSG:4326**. **Tested** and stable endpoints are used to avoid CORS or 404 issues.
 
-> Visible attribution: “Imagery © NASA EOSDIS GIBS / Worldview - NASA Solar System Treks”.\
+> Visible attribution: "Imagery (c) NASA EOSDIS GIBS / Worldview - NASA Solar System Treks".\
 > Respect the terms of use for each source.
 
 * * * * *
@@ -140,4 +140,5 @@ Roadmap (suggested)
 
 -   Layer measurement and comparison tools (swipe).
 
--   Guided “stories” with annotations and shareable links.
+-   Guided "stories" with annotations and shareable links.
+
