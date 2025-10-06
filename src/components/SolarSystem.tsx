@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { getLayerCatalog, layerDefaultDate, layerNeedsDate, type ApiLayer, type LayerCatalog } from "../services/layers";
@@ -17,9 +17,9 @@ type BodyMeta = {
 };
 
 const BODY_META: Record<string, BodyMeta> = {
-  earth: { label: "Tierra", emoji: "🌍", accent: "from-emerald-400/20 to-cyan-400/10" },
-  moon: { label: "Luna", emoji: "🌙", accent: "from-indigo-400/20 to-fuchsia-400/10" },
-  mars: { label: "Marte", emoji: "🔴", accent: "from-rose-400/20 to-amber-400/10" },
+  earth: { label: "Earth", emoji: "🌍", accent: "from-emerald-400/20 to-cyan-400/10" },
+  moon: { label: "Moon", emoji: "🌕", accent: "from-indigo-400/20 to-fuchsia-400/10" },
+  mars: { label: "Mars", emoji: "🔴", accent: "from-rose-400/20 to-amber-400/10" },
   ceres: { label: "Ceres", emoji: "🪐", accent: "from-sky-400/20 to-violet-400/10" },
 };
 
@@ -41,7 +41,7 @@ export default function SolarSystem() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "No se pudo cargar el catalogo");
+        setError(err instanceof Error ? err.message : "Failed to load the catalog");
         setLoading(false);
       });
     return () => { cancelled = true; };
@@ -75,7 +75,7 @@ export default function SolarSystem() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100">
-        Cargando catalogo de capas...
+        Loading layer catalog...
       </div>
     );
   }
@@ -83,7 +83,7 @@ export default function SolarSystem() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100 px-4 text-center">
-        No se pudo cargar el catalogo de capas: {error}
+        Could not load the layer catalog: {error}
       </div>
     );
   }
@@ -91,7 +91,7 @@ export default function SolarSystem() {
   if (!cards.length) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100 px-4 text-center">
-        No hay capas disponibles.
+        No layers available.
       </div>
     );
   }
@@ -102,18 +102,18 @@ export default function SolarSystem() {
         <div className="flex items-center gap-3">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_0_6px_rgba(56,189,248,0.25)]" />
           <h1 className="text-xl font-extrabold tracking-tight">
-            Embiggen Viewer - Sistema Solar
+            Embiggen Viewer - Solar System
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-300">
-          Elige un cuerpo para abrir el mapa con su capa predeterminada desde la nueva API. En la vista del mapa solo podras cambiar entre capas del mismo cuerpo.
+          Choose a body to open the map with its default layer from the new API. In the map view you can only switch between layers for the same body.
         </p>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 pb-14">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
           {cards.map(({ body, layer }) => {
-            const meta = BODY_META[body.toLowerCase()] ?? { label: body, emoji: "🪐", accent: "from-slate-400/20 to-slate-700/10" };
+            const meta = BODY_META[body.toLowerCase()] ?? { label: body, emoji: "🌐", accent: "from-slate-400/20 to-slate-700/10" };
             const caption = layer.title;
             return (
               <PlanetCard
@@ -129,7 +129,7 @@ export default function SolarSystem() {
         </div>
 
         <div className="mt-10 text-xs text-slate-400">
-          Fuente: api.qminds.io (proxy de NASA EOSDIS GIBS y Solar System Treks).
+          Source: api.qminds.io (proxy for NASA EOSDIS GIBS and Solar System Treks).
         </div>
       </div>
     </div>
@@ -156,7 +156,7 @@ function PlanetCard({ name, emoji, caption, onOpen, accent }: PlanetCardProps) {
           onClick={onOpen}
           className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-sky-300/40 bg-sky-300/10 hover:bg-sky-300/20 text-sm"
         >
-          Abrir mapa
+          Open map
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-80">
             <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>

@@ -60,7 +60,7 @@ export default function Navbar({
       className="fixed top-0 inset-x-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur shadow"
     >
       <div className="max-w-7xl mx-auto px-4">
-        {/* MULTI-FILA con wrap: sin scroll horizontal */}
+        {/* Multi-row layout with wrapping; prevents horizontal scrolling */}
         <div className="py-2 flex flex-wrap items-center gap-x-2 gap-y-2">
           {/* Branding */}
           <div className="flex items-center gap-2 pr-2">
@@ -68,85 +68,85 @@ export default function Navbar({
             <span className="font-extrabold text-slate-900 text-sm sm:text-base">Embiggen Viewer</span>
           </div>
 
-          {/* Capa */}
+          {/* Layer */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Capa</label>
+          <label className="text-xs font-semibold text-slate-600">Layer</label>
           <select
             value={layerId}
             onChange={(e) => onChangeLayer(e.target.value)}
             className="px-2.5 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
-            title="Capa base"
+            title="Base layer"
           >
             {layers.map((l) => (
               <option key={l.id} value={l.id}>{l.title}</option>
             ))}
           </select>
 
-          {/* Fecha */}
+          {/* Date */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Fecha</label>
+          <label className="text-xs font-semibold text-slate-600">Date</label>
           <input
             type="date"
             value={date}
             onChange={(e) => onChangeDate(e.target.value)}
             disabled={isDateDisabled}
             className={`px-2.5 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 ${isDateDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
-            title="Fecha (YYYY-MM-DD)"
+            title="Date (YYYY-MM-DD)"
           />
 
-          {/* Anotar */}
+          {/* Annotate */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Anotar</label>
+          <label className="text-xs font-semibold text-slate-600">Annotate</label>
           <div className="inline-flex rounded-md overflow-hidden border border-slate-300 bg-white">
             <button
               onClick={() => onSetDrawMode("Point")}
-              title="Punto (P)"
+              title="Point (P)"
               className={`px-3 py-1.5 text-sm ${drawMode === "Point" ? "bg-sky-100 border-r border-slate-300" : "border-r border-slate-300 hover:bg-slate-50"}`}
-            >Punto</button>
+            >Point</button>
             <button
               onClick={() => onSetDrawMode("Polygon")}
-              title="Poligono (G)"
+              title="Polygon (G)"
               className={`px-3 py-1.5 text-sm ${drawMode === "Polygon" ? "bg-sky-100 border-r border-slate-300" : "border-r border-slate-300 hover:bg-slate-50"}`}
-            >Poligono</button>
+            >Polygon</button>
             <button
               onClick={() => onSetDrawMode("None")}
-              title="Ninguno (N)"
+              title="None (N)"
               className={`px-3 py-1.5 text-sm ${drawMode === "None" ? "bg-sky-100" : "hover:bg-slate-50"}`}
-            >Ninguno</button>
+            >None</button>
           </div>
 
-          {/* Editar / Borrar */}
+          {/* Edit / Delete */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
           <button
             onClick={onToggleModify}
-            title="Editar (E)"
+            title="Edit (E)"
             className={`px-3 py-1.5 text-sm rounded-md border ${isModifyOn ? "border-sky-400 bg-sky-100" : "border-slate-300 bg-white hover:bg-slate-50"}`}
           >
-            {isModifyOn ? "Editar: ON" : "Editar: OFF"}
+            {isModifyOn ? "Edit: ON" : "Edit: OFF"}
           </button>
           <button
             onClick={onDeleteSelected}
-            title="Borrar seleccion (Del)"
+            title="Delete selection (Del)"
             className="px-3 py-1.5 text-sm rounded-md border border-rose-300 bg-rose-100 hover:bg-rose-200"
           >
-            Borrar
+            Delete
           </button>
 
-          {/* Opacidad */}
+          {/* Opacity */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <label className="text-xs font-semibold text-slate-600">Opacidad</label>
+          <label className="text-xs font-semibold text-slate-600">Opacity</label>
           <input
             type="range" min={0} max={1} step={0.05}
             value={opacity}
             onChange={(e) => onOpacityChange(Number(e.target.value))}
-            className="w-28" title="Opacidad de la capa"
+            className="w-28" title="Layer opacity"
           />
 
-          {/* Exportar / Importar */}
+          {/* Export / Import */}
           <div className="h-6 w-px bg-slate-200/90 mx-1" />
-          <button onClick={onExport} className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50" title="Exportar GeoJSON">Exportar</button>
+          <button onClick={onExport} className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50" title="Export GeoJSON">Export</button>
           <label className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer">
-            Importar
+            Import
             <input
               type="file" accept=".geojson,application/geo+json,application/json" className="hidden"
               onChange={(e) => {
@@ -160,13 +160,13 @@ export default function Navbar({
           {/* Spacer */}
           <div className="grow" />
 
-          {/* Recentrar + coords */}
+          {/* Reset view + cursor coords */}
           <div className="flex items-center gap-3">
             <button
               onClick={onResetView}
               className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50"
-              title="Recentrar (R)"
-            >Recentrar</button>
+              title="Reset view (R)"
+            >Reset view</button>
             <div className="text-[11px] text-slate-500">
               {cursorCoord ? `Cursor: ${cursorCoord.lon.toFixed(4)}, ${cursorCoord.lat.toFixed(4)}` : "Cursor: --"}
             </div>
@@ -174,8 +174,9 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Barra de progreso bajo el navbar */}
+      {/* Progress bar under the navbar */}
       <div className={`h-[3px] bg-gradient-to-r from-sky-400 via-sky-500 to-sky-400 transition-all duration-150 ${tilePending > 0 ? "opacity-100" : "opacity-0"}`} />
     </header>
   );
 }
+

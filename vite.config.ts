@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    // Proxy SOLO en dev (vite serve) para evitar CORS con trek.nasa.gov
+    // Development-only proxy (vite serve) to avoid CORS with trek.nasa.gov
     proxy: {
       "/trek": {
         target: "https://trek.nasa.gov/tiles",
@@ -16,7 +16,8 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/trek/, ""),
       },
     },
-    // CORS habilitado por si tu navegador es estricto
+    // Enable CORS in case the browser enforces strict rules
     cors: true,
   },
 });
+

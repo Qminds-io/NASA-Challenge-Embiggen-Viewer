@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import "ol/ol.css";
 
@@ -158,7 +158,7 @@ export default function MapView() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setCatalogError(err instanceof Error ? err.message : "No se pudo cargar el catalogo");
+        setCatalogError(err instanceof Error ? err.message : "Failed to load the catalog");
         setCatalogLoading(false);
       });
     return () => { cancelled = true; };
@@ -288,7 +288,7 @@ export default function MapView() {
       setAnnotKey((k) => k + 1);
     } catch (err) {
       if (err instanceof Error) setAnnotationsError(err.message);
-      else setAnnotationsError("No se pudieron cargar las anotaciones.");
+      else setAnnotationsError("Failed to load annotations.");
     } finally {
       setAnnotationsLoading(false);
       skipPersistRef.current = false;
@@ -346,7 +346,7 @@ export default function MapView() {
       setAnnotKey((k) => k + 1);
     } catch (err) {
       skipPersistRef.current = false;
-      setAnnotationsError(err instanceof Error ? err.message : "No se pudieron guardar las anotaciones.");
+      setAnnotationsError(err instanceof Error ? err.message : "Failed to save annotations.");
     } finally {
       setAnnotationsSaving(false);
     }
@@ -537,7 +537,7 @@ export default function MapView() {
     const draw = new Draw({ source: annotationsSourceRef.current, type });
     draw.on("drawend", (evt) => {
       const f = evt.feature;
-      const name = window.prompt("Nombre para la anotacion:", "") ?? "";
+      const name = window.prompt("Annotation name:", "") ?? "";
       f.set("name", name);
 
       const g = f.getGeometry();
@@ -619,7 +619,7 @@ export default function MapView() {
         schedulePersistAnnotations();
       } catch {
         skipPersistRef.current = false;
-        alert("No se pudo importar el GeoJSON.");
+        alert("Could not import the GeoJSON file.");
       }
     };
     reader.readAsText(file);
@@ -647,7 +647,7 @@ export default function MapView() {
     const proj = mapRef.current.getView().getProjection().getCode();
     const items = annotationsSourceRef.current.getFeatures().map((f, i) => {
       const raw = f.get("name");
-      const name = typeof raw === "string" && raw.length > 0 ? raw : `Anotacion ${i + 1}`;
+      const name = typeof raw === "string" && raw.length > 0 ? raw : `Annotation ${i + 1}`;
       let lon = NaN;
       let lat = NaN;
       const geom = f.getGeometry();
@@ -740,10 +740,10 @@ export default function MapView() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100">
         {catalogError
-          ? `No se pudo cargar el catalogo de capas: ${catalogError}`
+          ? `Could not load the layer catalog: ${catalogError}`
           : catalogLoading
-            ? "Cargando catalogo de capas..."
-            : "No hay capas disponibles."}
+            ? "Loading layer catalog..."
+            : "No layers available."}
       </div>
     );
   }
@@ -781,10 +781,10 @@ export default function MapView() {
         style={{ top: "calc(var(--navbar-h) + 12px)", height: "calc(100vh - var(--navbar-h) - 24px)" }}
       >
         <div className="flex items-center gap-2 mb-2">
-          <div className="font-extrabold text-slate-900 text-sm">Anotaciones</div>
+          <div className="font-extrabold text-slate-900 text-sm">Annotations</div>
           <div className="ml-auto" />
           <input
-            placeholder="Filtrar..."
+            placeholder="Filter..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="px-2 py-1.5 rounded-md border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
@@ -793,13 +793,13 @@ export default function MapView() {
 
         <div className="text-[11px] mb-2">
           {annotationsError ? (
-            <span className="text-rose-600">Anotaciones: {annotationsError}</span>
+            <span className="text-rose-600">Annotations: {annotationsError}</span>
           ) : annotationsLoading ? (
-            <span className="text-slate-500">Cargando anotaciones...</span>
+            <span className="text-slate-500">Loading annotations...</span>
           ) : annotationsSaving ? (
-            <span className="text-slate-500">Guardando anotaciones...</span>
+            <span className="text-slate-500">Saving annotations...</span>
           ) : tileErrors > 0 ? (
-            <span className="text-rose-600">Errores de carga: {tileErrors}</span>
+            <span className="text-rose-600">Tile errors: {tileErrors}</span>
           ) : (
             <span className="text-slate-400"> </span>
           )}
@@ -808,7 +808,7 @@ export default function MapView() {
         <div className="overflow-auto min-h-0">
           {annotationsList.length === 0 ? (
             <div className="text-sm text-slate-600">
-              No hay anotaciones. Usa <b>Punto</b> o <b>Poligono</b>.
+              No annotations yet. Use <b>Point</b> or <b>Polygon</b>.
             </div>
           ) : (
             <ul className="space-y-2">
@@ -822,18 +822,18 @@ export default function MapView() {
                     {Number.isFinite(lon) && Number.isFinite(lat) ? `${lon.toFixed(4)}, ${lat.toFixed(4)}` : "--"}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <button onClick={() => flyToFeature(feature)} className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50">Ir</button>
+                    <button onClick={() => flyToFeature(feature)} className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50">Go</button>
                     <button
                       onClick={() => {
-                        const newName = window.prompt("Cambiar nombre:", name) ?? name;
+                        const newName = window.prompt("Rename:", name) ?? name;
                         feature.set("name", newName);
                         setFilter((f) => f + "");
                         schedulePersistAnnotations();
                       }}
                       className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50"
-                    >Renombrar</button>
+                    >Rename</button>
                     {Number.isFinite(lon) && Number.isFinite(lat) && (
-                      <button onClick={() => copyCoords(lon, lat)} className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50">Copiar coords</button>
+                      <button onClick={() => copyCoords(lon, lat)} className="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50">Copy coordinates</button>
                     )}
                     <button
                       onClick={() => {
@@ -842,8 +842,8 @@ export default function MapView() {
                         setAnnotKey((k) => k + 1);
                       }}
                       className="px-2 py-1 text-xs rounded border border-rose-300 bg-rose-100 hover:bg-rose-200"
-                      title="Borrar esta anotacion"
-                    >Borrar</button>
+                      title="Delete this annotation"
+                    >Delete</button>
                   </div>
                 </li>
               ))}
@@ -857,12 +857,8 @@ export default function MapView() {
       </aside>
 
       <div className="fixed bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 border border-slate-200 rounded-md px-2 py-1 shadow-sm">
-        Escala en la esquina del mapa - Atajos: P/G/N/E/Del/R
+        Scale in the map corner - Shortcuts: P/G/N/E/Del/R
       </div>
     </div>
   );
 }
-
-
-
-

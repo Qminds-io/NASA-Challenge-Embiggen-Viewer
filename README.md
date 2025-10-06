@@ -1,149 +1,119 @@
 Embiggen Viewer
-===================================
+================
 
-Visualizador web para **Tierra y cuerpos del Sistema Solar** que integra **capas NASA GIBS** (satélite) y **NASA Solar System Treks** (planetas/lunas), con herramientas de **anotación**, **exportación GeoJSON**, **permalinks** y **UI responsiva**.
+Web viewer for Earth and Solar System bodies that combines NASA GIBS satellite layers with NASA Solar System Treks mosaics. The app ships annotation tools, GeoJSON import/export, sharable permalinks, and a responsive UI ready for touch or desktop.
 
-* * * * *
+-----
 
-Qué hace
---------
+What It Does
+------------
 
--   Muestra imágenes satelitales de **Tierra** (diurnas, nocturnas y mosaicos estáticos) desde **NASA GIBS**.
+- Displays daily and static imagery for Earth (daytime, night, and composite mosaics) from NASA GIBS.
+- Shows global mosaics for the Moon, Mars, and Ceres from NASA Solar System Treks.
+- Lets you annotate points and polygons, rename, edit, delete, copy coordinates, and import/export GeoJSON.
+- Persists view state in the URL hash so you can share location, zoom, date, and layer.
+- Switches projections automatically (EPSG:3857 for GIBS, EPSG:4326 for Treks).
+- Surface a progress indicator and tile error counter while requests are pending.
 
--   Muestra mosaicos globales de **Luna, Marte y Ceres** desde **NASA Solar System Treks**.
+-----
 
--   Permite **anotar** puntos y polígonos, **renombrar**, **editar**, **borrar**, **copiar coordenadas** y **importar/exportar** a **GeoJSON**.
+Tech Stack
+----------
 
--   Guarda la vista en la URL (hash) para **compartir** ubicación, zoom, fecha y capa.
+- **React + Vite + TypeScript**: fast SPA with type safety and modular structure.
+- **OpenLayers**: mapping engine (Map, View, TileLayer, VectorLayer, XYZ, WMTS, Draw/Modify/Select, GeoJSON).
+- **Tailwind CSS**: clean, responsive layout for the navbar and side panel.
+- **OSM**: optional basemap whenever the projection is EPSG:3857 (Earth).
 
--   Cambia **automáticamente** de proyección según el origen (**EPSG:3857** para GIBS, **EPSG:4326** para Treks).
+-----
 
--   Barra de progreso y contador de **errores** durante la carga de teselas.
+Data Sources
+------------
 
-* * * * *
+- **NASA GIBS** (Earth): WMTS services available as REST-style XYZ endpoints. Some layers are daily (require a date), others are static.
+- **NASA Solar System Treks** (Moon, Mars, Ceres): global WMTS mosaics consumed with EPSG:4326 tile grids. Verified, stable endpoints are used to avoid CORS/404 issues.
 
-Tecnologías y librerías
------------------------
+> Attribution to display: "Imagery © NASA EOSDIS GIBS / Worldview - NASA Solar System Treks". Respect the usage terms for each source.
 
--   **React + Vite + TypeScript**: SPA rápida, tipada y modular.
+-----
 
--   **OpenLayers**: motor cartográfico (Map, View, TileLayer, VectorLayer, XYZ, WMTS, Draw/Modify/Select, GeoJSON).
+Architecture Overview
+---------------------
 
--   **Tailwind CSS**: diseño limpio y responsivo para Navbar y panel lateral.
+- **Body picker screen**: users choose a planet/moon first; the viewer then loads with layers valid for that body.
+- **Viewer (Map component)**: handles projection changes, active layer, date (for GIBS), opacity, annotations, and permalinks.
+- **Navbar**: layer selector (plus date for GIBS), annotation modes (Point/Polygon/None), edit/delete toggles, opacity slider, GeoJSON export/import, recenter action, and live cursor coordinates.
 
--   **OSM**: base visual solo cuando la proyección es EPSG:3857 (Tierra).
+-----
 
-* * * * *
+Usage (High Level)
+------------------
 
-Fuentes de datos
-----------------
+1. Install dependencies with your usual package manager and run the dev server.
+2. Open the app in the browser.
+3. Pick a body (Earth, Moon, Mars, Ceres).
+4. Select the layer shown for that body.
+5. Choose a date when the layer requires one (GIBS daily products).
+6. Draw annotations (P or G), edit (E), delete (Del), export GeoJSON or import one.
+7. Share the URL; it captures lon/lat, zoom, date, layer, and projection.
 
--   **NASA GIBS** (Tierra): servicios WMTS disponibles en formato estilo-REST compatible con XYZ. Algunas capas son **diarias** (requieren fecha), otras **estáticas**.
+**Shortcuts:** P (Point), G (Polygon), N (None), E (Edit), Del (Delete), R (Recenter).
 
--   **NASA Solar System Treks** (Luna, Marte, Ceres): servicios **WMTS** globales, consumidos con rejilla WMTS en **EPSG:4326**. Se usan endpoints **probados** y estables para evitar problemas de CORS o 404.
+-----
 
-> Atribución visible: "Imagery © NASA EOSDIS GIBS / Worldview - NASA Solar System Treks".\
-> Respetar términos de uso de cada fuente.
+Key Decisions
+-------------
 
-* * * * *
+- **OpenLayers** delivers robust WMTS/XYZ support and fine-grained control over projections and interactions.
+- **Separate body/layer lists** simplify UX and avoid mismatches (no Mars layers while viewing the Moon).
+- **WMTS REST for Treks** relies on pre-validated endpoints to minimize CORS/404 surprises.
+- **Permalinks** keep sessions reproducible and easy to share—critical for data visualisation challenges.
 
-Estructura y arquitectura
--------------------------
+-----
 
--   **Pantalla de selección de cuerpo** (planeta/luna): el usuario primero elige el cuerpo; luego se abre el **viewer** con solo las capas válidas para ese cuerpo.
-
--   **Viewer** (Map): maneja la lógica de proyección, capa activa, fecha (para GIBS), opacidad, anotaciones y permalinks.
-
--   **Navbar**: selector de **capa** (y fecha para GIBS), modos de **anotación** (Punto/Polígono/Ninguno), **Editar/Borrar**, **Opacidad**, **Exportar/Importar GeoJSON**, **Recentrar**, y lectura de **coordenadas de cursor**.
-
-* * * * *
-
-Cómo se usa (alto nivel)
+Add New Layers (No Code)
 ------------------------
 
-1.  Instala dependencias con tu gestor habitual y ejecuta el entorno de desarrollo.
+**GIBS (Earth)**
 
-2.  Abre la app en el navegador.
+1. Locate the layer ID and matrix set (Level9 or Level8).
+2. Confirm whether it is daily (needs a date) or static.
+3. Append it to the Earth layer list using the existing structure.
 
-3.  Elige un **cuerpo** (Tierra, Luna, Marte, Ceres).
+**Treks (Moon/Mars/Ceres)**
 
-4.  Selecciona la **capa** disponible para ese cuerpo.
+1. Verify that the global mosaic endpoint exists and serves tiles without 404/CORS issues.
+2. Note the layer name (base endpoint), image format (jpg/png), and an appropriate maxZoom value.
+3. Add it to the list for the corresponding body.
 
-5.  (Solo GIBS) elige la **fecha**.
+> If a layer fails because of CORS/404, swap it for another publicly available option for the same body.
 
-6.  Dibuja **anotaciones** (P o G), edita (E), borra (Supr), exporta **GeoJSON** o impórtalo.
+-----
 
-7.  Comparte la URL: incluye **lon/lat**, **zoom**, **fecha**, **capa** y **proyección**.
+Space Apps Compliance
+---------------------
 
-**Atajos:** P (Punto), G (Polígono), N (Ninguno), E (Editar), Supr (Borrar), R (Recentrar).
+- **NASA open data**: GIBS and Treks.
+- **Educational impact**: noteworthy layers (True Color, night lights, global mosaics) and shareable annotations.
+- **Reproducibility**: no credentials required, permalink support, clear docs.
+- **Scalability**: straightforward to extend with more bodies and layers.
 
-* * * * *
+-----
 
-Decisiones clave (justificación)
---------------------------------
-
--   **OpenLayers**: soporte robusto para WMTS/XYZ y control fino de proyecciones e interacciones.
-
--   **Separación cuerpo/capa**: simplifica la UX y evita inconsistencias (p. ej., no mostrar capas de Marte cuando el cuerpo es Luna).
-
--   **WMTS REST para Treks**: se priorizan endpoints verificados para minimizar CORS/404; cuando un cuerpo no expone CORS de forma estable, se omite.
-
--   **Permalinks**: facilitan reproducibilidad y comunicación (requisito habitual en visualización de datos).
-
-* * * * *
-
-Añadir nuevas capas (sin código)
---------------------------------
-
-**GIBS (Tierra):**
-
-1.  Localiza el **ID** de la capa y su **matrixSet** (Level9 o Level8).
-
-2.  Comprueba si es **diaria** (necesita fecha) o **estática**.
-
-3.  Añádela a la lista de capas de Tierra (mismo formato que las existentes).
-
-**Treks (Luna/Marte/Ceres):**
-
-1.  Verifica que el endpoint de mosaico global exista y devuelva teselas (sin 404/CORS).
-
-2.  Anota el nombre de la capa (endpoint base), el **formato** (jpg/png) y un **maxZoom** razonable.
-
-3.  Añádela en la lista del cuerpo correspondiente.
-
-> Si una capa falla por CORS/404, sustitúyela por otra del mismo cuerpo que esté disponible públicamente.
-
-* * * * *
-
-Cumplimiento Space Apps
------------------------
-
--   **Datos abiertos NASA**: GIBS y Treks.
-
--   **Impacto educativo**: capas relevantes (True Color, nocturnas, mosaicos globales) y anotaciones compartibles.
-
--   **Reproducibilidad**: app sin credenciales, con permalinks y documentación clara.
-
--   **Escalabilidad**: fácil ampliar cuerpos y capas.
-
-* * * * *
-
-Licencias y créditos
+Licenses and Credits
 --------------------
 
--   **Código**: licencia abierta (ej. MIT).
+- **Code**: open licence (e.g., MIT).
+- **Imagery/data**: follow the terms for NASA EOSDIS GIBS / Worldview, NASA Solar System Treks, and OSM (when the 3857 basemap is used).
+- Always surface the appropriate attribution in the interface.
 
--   **Imágenes/datos**: según términos de **NASA EOSDIS GIBS / Worldview**, **NASA Solar System Treks** y **OSM** (si se usa base en 3857).
+-----
 
--   Mostrar siempre la **atribución** correspondiente en la interfaz.
+Suggested Roadmap
+-----------------
 
-* * * * *
+- Add more Treks bodies as soon as stable public endpoints are available.
+- Introduce measurement tools and layer comparison (swipe).
+- Publish guided “stories” that bundle annotations with shareable links.
 
-Hoja de ruta (sugerida)
------------------------
 
--   Añadir más cuerpos Treks cuando existan endpoints públicos estables.
-
--   Herramientas de medición y comparación de capas (swipe).
-
--   "Historias" guiadas con anotaciones y enlaces compartibles.
